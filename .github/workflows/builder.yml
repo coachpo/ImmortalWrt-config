@@ -13,6 +13,18 @@ on:
         type: boolean
         required: false
         default: false
+      jobs:
+        description: 'Parallel jobs: auto=nproc, or fixed number'
+        type: choice
+        required: false
+        default: auto
+        options:
+          - auto
+          - "1"
+          - "2"
+          - "4"
+          - "8"
+          - "16"
       model:
         description: 'Select model to build'
         type: choice
@@ -34,6 +46,7 @@ env:
   IMMORTALWRT_TAG: ${{ vars.IMMORTALWRT_TAG }}
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
+  JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
   CCACHE_MAX_SIZE: 4G
   # Notification settings
   BARK_SERVER_URL: ${{ secrets.BARK_SERVER_URL }}
@@ -146,7 +159,15 @@ jobs:
       id: compile
       run: |
         cd immortalwrt
-        if [ "${DEBUG_BUILD}" = "true" ]; then JOBS=1; else JOBS=$(nproc); fi
+        if [ "${DEBUG_BUILD}" = "true" ]; then
+          JOBS=1
+        else
+          if [ "${JOBS_INPUT}" = "auto" ] || [ -z "${JOBS_INPUT}" ]; then
+            JOBS=$(nproc)
+          else
+            JOBS="${JOBS_INPUT}"
+          fi
+        fi
         echo -e "${JOBS} thread compile"
         export CCACHE_DIR="$HOME/.ccache"
         which ccache && ccache --set-config=max_size=${CCACHE_MAX_SIZE} || true
