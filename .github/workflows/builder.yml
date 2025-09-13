@@ -8,13 +8,8 @@ on:
         type: boolean
         required: false
         default: true
-      single_thread:
-        description: 'Force single-threaded compile (make -j1)'
-        type: boolean
-        required: false
-        default: false
-      verbose:
-        description: 'Verbose build logs (V=sc)'
+      debug_build:
+        description: 'Debug build: single-thread + verbose logs'
         type: boolean
         required: false
         default: false
@@ -38,8 +33,7 @@ permissions:
 env:
   IMMORTALWRT_TAG: ${{ vars.IMMORTALWRT_TAG }}
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
-  SINGLE_THREAD: ${{ github.event.inputs.single_thread || 'false' }}
-  VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+  DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   CCACHE_MAX_SIZE: 4G
   # Notification settings
   BARK_SERVER_URL: ${{ secrets.BARK_SERVER_URL }}
@@ -152,7 +146,7 @@ jobs:
       id: compile
       run: |
         cd immortalwrt
-        if [ "${SINGLE_THREAD}" = "true" ]; then JOBS=1; else JOBS=$(nproc); fi
+        if [ "${DEBUG_BUILD}" = "true" ]; then JOBS=1; else JOBS=$(nproc); fi
         echo -e "${JOBS} thread compile"
         export CCACHE_DIR="$HOME/.ccache"
         which ccache && ccache --set-config=max_size=${CCACHE_MAX_SIZE} || true
@@ -162,7 +156,7 @@ jobs:
         which ccache && ccache --zero-stats || true
         echo "Go build cache dir:" $(go env GOCACHE 2>/dev/null || echo "(no go)") || true
         echo "Go module cache dir:" $(go env GOMODCACHE 2>/dev/null || echo "(no go)") || true
-        if [ "${VERBOSE}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
+        if [ "${DEBUG_BUILD}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
         make -j"${JOBS}" ${VERBOSE_FLAG} || make -j1 ${VERBOSE_FLAG} || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
