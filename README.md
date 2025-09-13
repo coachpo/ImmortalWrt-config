@@ -1,8 +1,10 @@
-# ImmortalWrt Seed Configurations 
+# ImmortalWrt Firmware Builder
 
-[![ImmortalWrt Builder](https://github.com/coachpo/ImmortalWrt-config/actions/workflows/openwrt-builder.yml/badge.svg?branch=main)](https://github.com/coachpo/ImmortalWrt-config/actions/workflows/openwrt-builder.yml)
+[![ImmortalWrt Builder](https://github.com/coachpo/ImmortalWrt-config/actions/workflows/builder.yml/badge.svg?branch=main)](https://github.com/coachpo/ImmortalWrt-config/actions/workflows/builder.yml)
 [![Latest Release](https://img.shields.io/github/v/release/coachpo/ImmortalWrt-config?sort=semver)](https://github.com/coachpo/ImmortalWrt-config/releases/latest)
 [![Downloads (latest)](https://img.shields.io/github/downloads/coachpo/ImmortalWrt-config/latest/total)](https://github.com/coachpo/ImmortalWrt-config/releases/latest)
+
+Seed configs and a GitHub Actions workflow to build and optionally release ImmortalWrt firmware for Cudy TR3000 and Xiaomi CR6606 from a pinned tag.
 
 - Cudy TR3000 (Filogic) 
 - Xiaomi CR6606 (MT7621)
@@ -19,9 +21,9 @@ cd immortalwrt
 ./scripts/feeds update -a && ./scripts/feeds install -a
 
 # 2. Place one seed config as .config (choose a profile)
-mv /path/to/ImmortalWrt_config/tr3000/seed.config .config    # TR3000 feature-rich
+mv /path/to/ImmortalWrt-config/tr3000/seed.config .config    # TR3000 feature-rich
 # or
-mv /path/to/ImmortalWrt_config/cr6606/seed.config .config    # CR6606 lean
+mv /path/to/ImmortalWrt-config/cr6606/seed.config .config    # CR6606 lean
 
 # 3. Expand defaults
 make defconfig
