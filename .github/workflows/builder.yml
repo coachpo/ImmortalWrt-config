@@ -52,6 +52,20 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
+    - name: Setup swap space (4G)
+      if: ${{ !cancelled() }}
+      run: |
+        if ! sudo swapon --show | grep -q "/swapfile"; then
+          echo "Creating 4G swapfile..."
+          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+        fi
+        echo "Active swap devices:"
+        sudo swapon --show || true
+        free -h
+
     - name: Pin immortalwrt submodule to tag
       run: |
         # Ensure submodule has tags and is on requested tag
