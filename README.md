@@ -69,7 +69,7 @@ This table compares the features enabled by both seed configurations.
 | ✅ | ✅ | Advanced networking | Extensive networking tools (curl, wget, arping, etc.) | |
 | ✅ | ✅ | Editor (vim) | Full-featured CLI editor | |
 | ❌ | ✅ | File sharing | Samba4 server with Avahi, NetBIOS, VFS, and WSDD2 + Chinese UI | |
-| ❌ | ✅ | USB printing | Print server (p910nd JetDirect) with LuCI UI + Chinese UI | |
+| ❌ | ✅ | USB printing | Print server (p910nd JetDirect) with LuCI UI + Chinese UI | CR6606 lacks USB ports |
 | ❌ | ✅ | Disk management | LuCI disk manager with Btrfs, NTFS3 support + Chinese UI | CR6606 lacks USB ports |
 | ❌ | ✅ | Storage & filesystems | Full filesystem support (ext4, Btrfs, exFAT, NTFS3) | CR6606 lacks USB ports |
 | ❌ | ✅ | USB networking | Extensive USB-to-Ethernet adapter support | CR6606 lacks USB ports |
@@ -81,3 +81,4 @@ This table compares the features enabled by both seed configurations.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
