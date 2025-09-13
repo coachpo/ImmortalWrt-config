@@ -43,7 +43,7 @@ This table compares the features enabled by both seed configurations.
 
 | CR6606 | TR3000 | Feature | Purpose | Notes |
 | --- | --- | --- | --- | --- |
-| ✅ | ✅ | LuCI Web UI + themes | Web management with themes (Bootstrap/Argon/Material + Chinese UI) | |
+| ✅ | ✅ | LuCI Web UI + themes | Web management with themes (Bootstrap/Argon + Chinese UI) | |
 | ✅ | ✅ | Web server (LuCI) | Serves LuCI over HTTP with uHTTPd | |
 | ✅ | ✅ | Wireless | Wi-Fi 6 support with MT7915E driver, regulatory database (wireless-regdb), and WPA2/3 (wpad-openssl) | |
 | ✅ | ✅ | QoS (nftables) | Simple bandwidth/QoS rules with nft-qos + Chinese UI | |
@@ -81,4 +81,5 @@ This table compares the features enabled by both seed configurations.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 
