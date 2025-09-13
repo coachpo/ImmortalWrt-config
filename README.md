@@ -42,7 +42,6 @@ This table compares the features enabled by both seed configurations.
 | ✅ | ✅ | Wireless | Wi-Fi 6 support with MT7915E driver, regulatory database (wireless-regdb), and WPA2/3 (wpad-openssl) | |
 | ✅ | ✅ | QoS (nftables) | Simple bandwidth/QoS rules with nft-qos + Chinese UI | |
 | ✅ | ✅ | Diagnostics | Basic troubleshooting tools (iperf3, tcpdump, htop) | |
-| ❌ | ❌ | Bandwidth monitoring | Not included by default; optionally add `nlbwmon` or `wrtbwmon` | |
 | ✅ | ✅ | Web terminal | Shell access in browser (ttyd) + Chinese UI | |
 | ✅ | ✅ | Local discovery | mDNS/Bonjour and name resolution (Avahi, nss-mdns) | |
 | ✅ | ✅ | UPnP IGD | Auto port forwarding (miniupnpd-nftables) + Chinese UI | |
