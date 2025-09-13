@@ -1,0 +1,295 @@
+name: ImmortalWrt Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_release:
+        description: 'Upload firmware artifacts and publish GitHub Release'
+        type: boolean
+        required: false
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMMORTALWRT_TAG: ${{ vars.IMMORTALWRT_TAG }}
+  UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
+  VERBOSE: false
+  CCACHE_MAX_SIZE: 4G
+  # Notification settings
+  BARK_SERVER_URL: ${{ secrets.BARK_SERVER_URL }}
+  BARK_SUCCESS_SOUND: "birdsong"
+  BARK_FAILURE_SOUND: "calypso"
+  BARK_ICON: "https://firmware-selector.immortalwrt.org/favicon.ico"
+  BARK_GROUP: "ImmortalWrt"
+
+jobs:
+  build:
+    name: Build (${{ matrix.model }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [cr6606, tr3000]
+
+    steps:
+    - name: Checkout repository (with submodules)
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo bash -c 'bash <(curl -s https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
+
+    - name: Pin immortalwrt submodule to tag
+      run: |
+        # Ensure submodule has tags and is on requested tag
+        git -C immortalwrt remote -v || true
+        git -C immortalwrt fetch origin --force --prune --depth=1 tag "${IMMORTALWRT_TAG}" || true
+        git -C immortalwrt checkout -f "tags/${IMMORTALWRT_TAG}"
+        git -C immortalwrt reset --hard "tags/${IMMORTALWRT_TAG}"
+
+    - name: Cache downloads (dl)
+      uses: actions/cache@v4
+      with:
+        path: immortalwrt/dl
+        key: dl-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}
+        restore-keys: |
+          dl-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
+
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ~/.ccache
+        key: ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}
+        restore-keys: |
+          ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
+
+    - name: Prepare model config
+      run: |
+        cp "${{ github.workspace }}/${{ matrix.model }}/seed.config" immortalwrt/.config
+
+    - name: Update feeds
+      run: |
+        cd immortalwrt
+        ./scripts/feeds update -a
+
+    - name: Install feeds
+      run: |
+        cd immortalwrt
+        ./scripts/feeds install -a
+
+    - name: Generate config
+      run: |
+        cd immortalwrt
+        make defconfig
+
+    - name: Compile the firmware
+      id: compile
+      run: |
+        cd immortalwrt
+        echo -e "$(nproc) thread compile"
+        export CCACHE_DIR="$HOME/.ccache"
+        which ccache && ccache --set-config=max_size=${CCACHE_MAX_SIZE} || true
+        which ccache && ccache --set-config=compression=true || true
+        which ccache && ccache --set-config=compression_level=6 || true
+        which ccache && (ccache --show-config || ccache --print-config) || true
+        which ccache && ccache --zero-stats || true
+        echo "Go build cache dir:" $(go env GOCACHE 2>/dev/null || echo "(no go)") || true
+        echo "Go module cache dir:" $(go env GOMODCACHE 2>/dev/null || echo "(no go)") || true
+        if [ "${VERBOSE}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
+        make -j"$(nproc)" ${VERBOSE_FLAG} || make -j1 ${VERBOSE_FLAG} || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+        echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
+
+    - name: Cache stats
+      if: steps.compile.outputs.status == 'success'
+      run: |
+        which ccache && ccache -s || true
+        if command -v du >/dev/null; then
+          gc=$(go env GOCACHE 2>/dev/null || echo "")
+          gm=$(go env GOMODCACHE 2>/dev/null || echo "")
+          [ -n "$gc" ] && du -sh "$gc" 2>/dev/null || true
+          [ -n "$gm" ] && du -sh "$gm" 2>/dev/null || true
+        fi
+
+    - name: Check space usage
+      if: (!cancelled())
+      run: df -hT
+
+    - name: Collect firmware files
+      id: collect
+      run: |
+        if [ "${{ matrix.model }}" = "tr3000" ]; then
+          dir="immortalwrt/bin/targets/mediatek/filogic"
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod-bl31-uboot.fip" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod-initramfs-recovery.itb" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod-preloader.bin" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod-squashfs-sysupgrade.itb" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          dir="immortalwrt/bin/targets/ramips/mt7621"
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-initramfs-kernel.bin" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-firmware.bin" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-sysupgrade.bin" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload firmware files
+      uses: actions/upload-artifact@main
+      if: ${{ github.event.inputs.upload_release == 'true' && !cancelled() }}
+      with:
+        name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
+        path: ${{ steps.collect.outputs.files }}
+        retention-days: 30
+
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+        retain_days: 0
+        keep_minimum_runs: 2
+
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@master
+      if: ${{ github.event.inputs.upload_release == 'true' && !cancelled() }}
+      with:
+        keep_latest: 3
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    if: ${{ always() && needs.build.result == 'success' && github.event.inputs.upload_release == 'true' }}
+    needs: build
+    runs-on: ubuntu-22.04
+    outputs:
+      release_tag: ${{ steps.tag.outputs.release_tag }}
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prepare release files directory
+        run: |
+          mkdir -p release
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Organize release files by model
+        run: |
+          mkdir -p release/tr3000 release/cr6606
+          # TR3000 files
+          find release -type f \( -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.fip' -o -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.itb' -o -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.bin' \) -exec cp -f {} release/tr3000/ \;
+          # CR6606 files
+          find release -type f \( -name 'immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-*.bin' \) -exec cp -f {} release/cr6606/ \;
+
+      - name: Generate release tag
+        id: tag
+        run: |
+          echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Summarize artifacts
+        run: |
+          echo "Artifacts included in release (by model):" > release.txt
+          echo "\ntr3000:" >> release.txt
+          ls -lh release/tr3000 || true >> release.txt
+          echo "\ncr6606:" >> release.txt
+          ls -lh release/cr6606 || true >> release.txt
+
+      - name: Upload firmware to release (combined)
+        uses: softprops/action-gh-release@master
+        if: steps.tag.outputs.status == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          body_path: release.txt
+          files: |
+            release/tr3000/*
+            release/cr6606/*
+
+  notify-completion:
+    runs-on: ubuntu-latest
+    needs: [ build, release ]
+    if: always()
+    steps:
+      - name: Send workflow completion notification via Bark
+        shell: bash
+        run: |
+          BUILD_STATUS="${{ needs.build.result }}"
+          RELEASE_STATUS="${{ needs.release.result }}"
+          TAG="${{ needs.release.outputs.release_tag }}"
+
+          if [ -z "${BARK_SERVER_URL}" ]; then
+            echo "BARK_SERVER_URL not set; skipping notification."
+            exit 0
+          fi
+
+          # If releases are disabled, skip notifying on successful builds
+          if [ "${UPLOAD_RELEASE}" != "true" ]; then
+            if [ "$BUILD_STATUS" = "success" ]; then
+              echo "Releases disabled; build succeeded; skipping notification."
+              exit 0
+            fi
+          fi
+
+          if [ "$BUILD_STATUS" = "success" ] && [ "$RELEASE_STATUS" = "success" ]; then
+            REPO="${GITHUB_REPOSITORY}"
+            RELEASE_URL="https://github.com/${REPO}/releases/tag/${TAG}"
+            TITLE="🚀 ImmortalWrt: Release Ready"
+            BODY="Tag: ${TAG} | [Open Release](${RELEASE_URL})"
+            ENC_TITLE=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$TITLE")
+            ENC_BODY=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$BODY")
+            curl -sS -X POST "${{ env.BARK_SERVER_URL }}/${ENC_TITLE}/${ENC_BODY}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "sound": "${{ env.BARK_SUCCESS_SOUND }}",
+                "icon": "${{ env.BARK_ICON }}",
+                "group": "${{ env.BARK_GROUP }}"
+              }'
+          elif [ "$BUILD_STATUS" = "success" ] && [ "$RELEASE_STATUS" != "success" ]; then
+            TITLE="⚠️ ImmortalWrt: Partial"
+            BODY="Build ok; release: ${RELEASE_STATUS}"
+            ENC_TITLE=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$TITLE")
+            ENC_BODY=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$BODY")
+            curl -sS -X POST "${{ env.BARK_SERVER_URL }}/${ENC_TITLE}/${ENC_BODY}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "sound": "${{ env.BARK_FAILURE_SOUND }}",
+                "icon": "${{ env.BARK_ICON }}",
+                "group": "${{ env.BARK_GROUP }}"
+              }'
+          else
+            TITLE="❌ ImmortalWrt: Failed"
+            BODY="Build: ${BUILD_STATUS} | Release: ${RELEASE_STATUS}"
+            ENC_TITLE=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$TITLE")
+            ENC_BODY=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$BODY")
+            curl -sS -X POST "${{ env.BARK_SERVER_URL }}/${ENC_TITLE}/${ENC_BODY}" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "sound": "${{ env.BARK_FAILURE_SOUND }}",
+                "icon": "${{ env.BARK_ICON }}",
+                "group": "${{ env.BARK_GROUP }}"
+              }'
+          fi

@@ -1,5 +1,9 @@
 # ImmortalWrt Seed Configurations 
 
+[![ImmortalWrt Builder](https://github.com/coachpo/ImmortalWrt-config/actions/workflows/openwrt-builder.yml/badge.svg?branch=main)](https://github.com/coachpo/ImmortalWrt-config/actions/workflows/openwrt-builder.yml)
+[![Latest Release](https://img.shields.io/github/v/release/coachpo/ImmortalWrt-config?sort=semver)](https://github.com/coachpo/ImmortalWrt-config/releases/latest)
+[![Downloads (latest)](https://img.shields.io/github/downloads/coachpo/ImmortalWrt-config/latest/total)](https://github.com/coachpo/ImmortalWrt-config/releases/latest)
+
 - Cudy TR3000 (Filogic) 
 - Xiaomi CR6606 (MT7621)
 
