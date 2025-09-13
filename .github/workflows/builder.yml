@@ -13,6 +13,11 @@ on:
         type: boolean
         required: false
         default: false
+      verbose:
+        description: 'Verbose build logs (V=sc)'
+        type: boolean
+        required: false
+        default: false
       model:
         description: 'Select model to build'
         type: choice
@@ -34,7 +39,7 @@ env:
   IMMORTALWRT_TAG: ${{ vars.IMMORTALWRT_TAG }}
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
   SINGLE_THREAD: ${{ github.event.inputs.single_thread || 'false' }}
-  VERBOSE: false
+  VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
   CCACHE_MAX_SIZE: 4G
   # Notification settings
   BARK_SERVER_URL: ${{ secrets.BARK_SERVER_URL }}
