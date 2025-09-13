@@ -75,4 +75,5 @@ This table compares the features enabled by both seed configurations.
 
 
 ## License
-This project is released under the MIT License. See the `LICENSE` file in the repository root for full text.
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
