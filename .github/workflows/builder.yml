@@ -104,13 +104,11 @@ jobs:
           immortalwrt/staging_dir/host
           immortalwrt/staging_dir/toolchain-*
         key: toolchain-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}
-        restore-keys: |
-          toolchain-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
 
     - name: Prepare model config
       run: |
         cp "${{ github.workspace }}/${{ matrix.model }}/seed.config" immortalwrt/.config
-        
+
     - name: Generate config
       run: |
         cd immortalwrt
@@ -146,7 +144,7 @@ jobs:
         fi
 
     - name: Check space usage
-      if: (!cancelled())
+      if: ${{ !cancelled() }}
       run: df -hT
 
     - name: Collect firmware files
@@ -172,7 +170,7 @@ jobs:
         fi
 
     - name: Upload firmware files
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       if: ${{ github.event.inputs.upload_release == 'true' && !cancelled() }}
       with:
         name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
@@ -241,7 +239,7 @@ jobs:
           ls -lh release/cr6606 || true >> release.txt
 
       - name: Upload firmware to release (combined)
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v2
         if: steps.tag.outputs.status == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
