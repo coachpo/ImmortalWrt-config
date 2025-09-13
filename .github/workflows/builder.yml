@@ -8,6 +8,11 @@ on:
         type: boolean
         required: false
         default: true
+      single_thread:
+        description: 'Force single-threaded compile (make -j1)'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,6 +24,7 @@ permissions:
 env:
   IMMORTALWRT_TAG: ${{ vars.IMMORTALWRT_TAG }}
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
+  SINGLE_THREAD: ${{ github.event.inputs.single_thread || 'false' }}
   VERBOSE: false
   CCACHE_MAX_SIZE: 4G
   # Notification settings
@@ -132,7 +138,8 @@ jobs:
       id: compile
       run: |
         cd immortalwrt
-        echo -e "$(nproc) thread compile"
+        if [ "${SINGLE_THREAD}" = "true" ]; then JOBS=1; else JOBS=$(nproc); fi
+        echo -e "${JOBS} thread compile"
         export CCACHE_DIR="$HOME/.ccache"
         which ccache && ccache --set-config=max_size=${CCACHE_MAX_SIZE} || true
         which ccache && ccache --set-config=compression=true || true
@@ -142,7 +149,7 @@ jobs:
         echo "Go build cache dir:" $(go env GOCACHE 2>/dev/null || echo "(no go)") || true
         echo "Go module cache dir:" $(go env GOMODCACHE 2>/dev/null || echo "(no go)") || true
         if [ "${VERBOSE}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
-        make -j"$(nproc)" ${VERBOSE_FLAG} || make -j1 ${VERBOSE_FLAG} || make -j1 V=s
+        make -j"${JOBS}" ${VERBOSE_FLAG} || make -j1 ${VERBOSE_FLAG} || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
