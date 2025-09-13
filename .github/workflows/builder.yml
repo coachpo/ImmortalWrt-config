@@ -68,6 +68,16 @@ jobs:
         restore-keys: |
           dl-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
 
+    - name: Cache feeds checkout
+      uses: actions/cache@v4
+      with:
+        path: |
+          immortalwrt/feeds
+          immortalwrt/package/feeds
+        key: feeds-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}
+        restore-keys: |
+          feeds-${{ runner.os }}-
+
     - name: Cache ccache
       uses: actions/cache@v4
       with:
@@ -94,6 +104,16 @@ jobs:
       run: |
         cd immortalwrt
         make defconfig
+
+    - name: Cache host and toolchain
+      uses: actions/cache@v4
+      with:
+        path: |
+          immortalwrt/staging_dir/host
+          immortalwrt/staging_dir/toolchain-*
+        key: toolchain-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}
+        restore-keys: |
+          toolchain-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
 
     - name: Compile the firmware
       id: compile
