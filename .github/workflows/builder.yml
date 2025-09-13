@@ -138,6 +138,7 @@ jobs:
           echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod-initramfs-recovery.itb" >> $GITHUB_OUTPUT
           echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod-preloader.bin" >> $GITHUB_OUTPUT
           echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod-squashfs-sysupgrade.itb" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-mediatek-filogic-cudy_tr3000-v1-ubootmod.manifest" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         else
           dir="immortalwrt/bin/targets/ramips/mt7621"
@@ -145,6 +146,7 @@ jobs:
           echo "$dir/immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-initramfs-kernel.bin" >> $GITHUB_OUTPUT
           echo "$dir/immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-firmware.bin" >> $GITHUB_OUTPUT
           echo "$dir/immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-sysupgrade.bin" >> $GITHUB_OUTPUT
+          echo "$dir/immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606.manifest" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         fi
 
@@ -199,9 +201,9 @@ jobs:
         run: |
           mkdir -p release/tr3000 release/cr6606
           # TR3000 files
-          find release -type f \( -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.fip' -o -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.itb' -o -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.bin' \) -exec cp -f {} release/tr3000/ \;
+          find release -type f \( -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.fip' -o -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.itb' -o -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.bin' -o -name 'immortalwrt-mediatek-filogic-cudy_tr3000-*.manifest' \) -exec cp -f {} release/tr3000/ \;
           # CR6606 files
-          find release -type f \( -name 'immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-*.bin' \) -exec cp -f {} release/cr6606/ \;
+          find release -type f \( -name 'immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606-*.bin' -o -name 'immortalwrt-ramips-mt7621-xiaomi_mi-router-cr6606*.manifest' \) -exec cp -f {} release/cr6606/ \;
 
       - name: Generate release tag
         id: tag
