@@ -56,7 +56,6 @@ This table compares the features enabled by both seed configurations.
 | ✅ | ✅ | Firewall | nftables-based firewall4 | |
 | ✅ | ✅ | CA certificates | Root certificate bundle for TLS validation | |
 | ✅ | ✅ | DNS tools | BIND client tools (host, dig) with DoH support | |
-| ✅ | ✅ | OAF/App Filter | Application filtering with kernel module and LuCI UI + Chinese UI | |
 | ✅ | ✅ | Online Users | Show online client list + Chinese UI | |
 | ✅ | ✅ | Package Manager UI | Manage packages in LuCI + Chinese UI | |
 | ✅ | ✅ | Temperature monitoring | System temperature status in LuCI | TR3000: CPU + Wi‑Fi; CR6606: Wi‑Fi only |
