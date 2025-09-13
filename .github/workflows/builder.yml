@@ -13,6 +13,15 @@ on:
         type: boolean
         required: false
         default: false
+      model:
+        description: 'Select model to build'
+        type: choice
+        required: false
+        default: all
+        options:
+          - all
+          - cr6606
+          - tr3000
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -41,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model: [cr6606, tr3000]
+        model: ${{ fromJSON((github.event.inputs.model == '' || github.event.inputs.model == 'all') && '["cr6606","tr3000"]' || format('["{0}"]', github.event.inputs.model)) }}
 
     steps:
     - name: Checkout repository (with submodules)
