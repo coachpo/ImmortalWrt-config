@@ -181,9 +181,9 @@ jobs:
         echo "Go build cache dir:" $(go env GOCACHE 2>/dev/null || echo "(no go)") || true
         echo "Go module cache dir:" $(go env GOMODCACHE 2>/dev/null || echo "(no go)") || true
         if [ "${DEBUG_BUILD}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
-        env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CCACHE_DIR="$HOME/.ccache" make -j"${JOBS}" ${VERBOSE_FLAG} \
-          || env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CCACHE_DIR="$HOME/.ccache" make -j1 ${VERBOSE_FLAG} \
-          || env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CCACHE_DIR="$HOME/.ccache" make -j1 V=s
+        env -i LC_ALL=C PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CCACHE_DIR="$HOME/.ccache" make -j"${JOBS}" ${VERBOSE_FLAG} \
+          || env -i LC_ALL=C PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CCACHE_DIR="$HOME/.ccache" make -j1 ${VERBOSE_FLAG} \
+          || env -i LC_ALL=C PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin CCACHE_DIR="$HOME/.ccache" make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
