@@ -58,7 +58,10 @@ env:
 jobs:
   build:
     name: Build (${{ matrix.model }})
-    runs-on: ubuntu-22.04
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     strategy:
       fail-fast: false
       matrix:
