@@ -238,6 +238,7 @@ jobs:
 
     - name: Delete workflow runs (best-effort)
       uses: Mattraks/delete-workflow-runs@main
+      if: ${{ always() }}
       continue-on-error: true
       with:
         retain_days: 0
