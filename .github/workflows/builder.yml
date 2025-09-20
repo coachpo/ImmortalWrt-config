@@ -61,7 +61,7 @@ jobs:
     permissions:
       contents: read
       actions: write
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     container: ghcr.io/openwrt/buildbot/buildworker-v3.11.8:v23
     strategy:
       fail-fast: false
@@ -238,7 +238,7 @@ jobs:
   release:
     if: ${{ always() && needs.build.result == 'success' && github.event.inputs.upload_release == 'true' }}
     needs: build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.tag.outputs.release_tag }}
     permissions:
