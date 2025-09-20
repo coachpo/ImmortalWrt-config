@@ -201,15 +201,6 @@ jobs:
         path: ${{ steps.collect.outputs.files }}
         retention-days: 30
         
-    - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@master
-      if: ${{ github.event.inputs.upload_release == 'true' && !cancelled() }}
-      with:
-        keep_latest: 3
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   release:
     if: ${{ always() && needs.build.result == 'success' && github.event.inputs.upload_release == 'true' }}
     needs: build
