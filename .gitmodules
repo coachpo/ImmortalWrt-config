@@ -1,4 +1,4 @@
 [submodule "immortalwrt"]
 	path = immortalwrt
 	url = https://github.com/immortalwrt/immortalwrt.git
-	branch = master
+	branch = v24.10.2
