@@ -61,10 +61,8 @@ jobs:
     permissions:
       contents: read
       actions: write
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
+    runs-on: ubuntu-22.04
+    container: ghcr.io/openwrt/buildbot/buildworker-v3.11.8:v23
     strategy:
       fail-fast: false
       matrix:
@@ -77,36 +75,9 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    - name: Initialization environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
+    - name: Ensure workspace
       run: |
-        sudo apt update -y
-        sudo apt full-upgrade -y
-        sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-          bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
-          g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
-          libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
-          libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
-          ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
-          python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
-          upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
-
-    - name: Setup swap space (4G)
-      if: ${{ !cancelled() }}
-      run: |
-        if ! sudo swapon --show | grep -q "/swapfile"; then
-          echo "Creating 4G swapfile..."
-          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-        fi
-        echo "Active swap devices:"
-        sudo swapon --show || true
-        free -h
+        mkdir -p /workdir || true
 
     - name: Pin immortalwrt submodule to tag
       run: |
