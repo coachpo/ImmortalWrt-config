@@ -130,7 +130,6 @@ jobs:
         cp "${{ matrix.model }}/seed.config" immortalwrt/.config
 
     - name: Compute seed hash (for build caches)
-        
       run: |
         echo "SEED_HASH=$(sha256sum \"${{ matrix.model }}/seed.config\" | cut -d ' ' -f1)" >> $GITHUB_ENV
 
