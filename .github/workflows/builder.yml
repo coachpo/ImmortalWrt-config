@@ -115,7 +115,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}
+        key: ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}-${{ matrix.container }}
         restore-keys: |
           ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
 
@@ -144,7 +144,23 @@ jobs:
         path: |
           immortalwrt/staging_dir/host
           immortalwrt/staging_dir/toolchain-*
-        key: toolchain-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}
+        key: toolchain-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}-${{ matrix.container }}
+
+    - name: Purge incompatible cached host tools (glibc check)
+      run: |
+        if [ -x immortalwrt/staging_dir/host/bin/sed ]; then
+          echo "Checking cached host sed binary..."
+          set +e
+          immortalwrt/staging_dir/host/bin/sed --version >/dev/null 2>&1
+          rc=$?
+          set -e
+          if [ $rc -ne 0 ]; then
+            echo "Incompatible cached host tools detected; purging immortalwrt/staging_dir/host"
+            rm -rf immortalwrt/staging_dir/host
+          else
+            echo "Cached host tools look compatible."
+          fi
+        fi
 
     - name: Prepare model config
       run: |
