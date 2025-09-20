@@ -79,7 +79,7 @@ jobs:
       run: |
         mkdir -p /workdir || true
 
-    - name: Setup 6G swap (best-effort)
+    - name: Setup 6G swap
       if: runner.os == 'Linux'
       continue-on-error: true
       run: |
@@ -200,6 +200,7 @@ jobs:
         name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
         path: ${{ steps.collect.outputs.files }}
         retention-days: 30
+        
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@master
       if: ${{ github.event.inputs.upload_release == 'true' && !cancelled() }}
