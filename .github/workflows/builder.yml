@@ -74,10 +74,13 @@ jobs:
         submodules: recursive
         fetch-depth: 1
         
+    - name: Prepare ccache dir
+      run: mkdir -p immortalwrt/.ccache
+
     - name: Restore ccache cache (per model/ref)
       uses: actions/cache@v4
       with:
-        path: ~/.ccache
+        path: immortalwrt/.ccache
         key: ${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}
         restore-keys: |
           ${{ runner.os }}-ccache-${{ matrix.model }}-
@@ -94,8 +97,7 @@ jobs:
 
     - name: Setup ccache
       run: |
-        echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
-        ccache -M ${CCACHE_MAX_SIZE}
+        CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
 
     - name: Restore feeds cache (per ref + feeds.conf)
       uses: actions/cache@v4
@@ -126,9 +128,10 @@ jobs:
         echo "SEED_HASH=$HASH" >> $GITHUB_ENV
         echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
 
-    - name: Generate config
+    - name: Generate config (enable ccache)
       run: |
         cd immortalwrt
+        grep -q '^CONFIG_CCACHE=y' .config || echo 'CONFIG_CCACHE=y' >> .config
         make defconfig
 
     - name: Restore toolchain caches (per model/ref)
