@@ -93,31 +93,7 @@ jobs:
         git -C immortalwrt checkout -f "tags/${IMMORTALWRT_TAG}"
         git -C immortalwrt reset --hard "tags/${IMMORTALWRT_TAG}"
 
-    - name: Cache downloads (dl)
-      uses: actions/cache@v4
-      with:
-        path: immortalwrt/dl
-        key: dl-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}
-        restore-keys: |
-          dl-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
-
-    - name: Cache feeds checkout
-      uses: actions/cache@v4
-      with:
-        path: |
-          immortalwrt/feeds
-          immortalwrt/package/feeds
-        key: feeds-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}
-        restore-keys: |
-          feeds-${{ runner.os }}-
-
-    - name: Cache ccache
-      uses: actions/cache@v4
-      with:
-        path: ~/.ccache
-        key: ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}-${{ matrix.container }}
-        restore-keys: |
-          ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
+    
 
     - name: Configure Git safe directories
       run: |
@@ -138,29 +114,7 @@ jobs:
         ./scripts/feeds install -a
 
 
-    - name: Cache host and toolchain
-      uses: actions/cache@v4
-      with:
-        path: |
-          immortalwrt/staging_dir/host
-          immortalwrt/staging_dir/toolchain-*
-        key: toolchain-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-${{ matrix.model }}-${{ matrix.container }}
-
-    - name: Purge incompatible cached host tools (glibc check)
-      run: |
-        if [ -x immortalwrt/staging_dir/host/bin/sed ]; then
-          echo "Checking cached host sed binary..."
-          set +e
-          immortalwrt/staging_dir/host/bin/sed --version >/dev/null 2>&1
-          rc=$?
-          set -e
-          if [ $rc -ne 0 ]; then
-            echo "Incompatible cached host tools detected; purging immortalwrt/staging_dir/host"
-            rm -rf immortalwrt/staging_dir/host
-          else
-            echo "Cached host tools look compatible."
-          fi
-        fi
+    
 
     - name: Prepare model config
       run: |
@@ -192,16 +146,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
-    - name: Cache stats
-      if: steps.compile.outputs.status == 'success'
-      run: |
-        which ccache && ccache -s || true
-        if command -v du >/dev/null; then
-          gc=$(go env GOCACHE 2>/dev/null || echo "")
-          gm=$(go env GOMODCACHE 2>/dev/null || echo "")
-          [ -n "$gc" ] && du -sh "$gc" 2>/dev/null || true
-          [ -n "$gm" ] && du -sh "$gm" 2>/dev/null || true
-        fi
+    
 
     - name: Check space usage
       if: ${{ !cancelled() }}
