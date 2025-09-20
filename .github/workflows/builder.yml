@@ -253,8 +253,8 @@ jobs:
         run: |
           VERSION_PREFIXED="immortalwrt-${IMMORTALWRT_REF:-unknown}"
           VERSION_SAFE="$(echo "$VERSION_PREFIXED" | sed 's/[^A-Za-z0-9._-]/_/g')"
-          TIME_TAG="$(date +"%Y.%m.%d-%H%M")"
-          echo "release_tag=${TIME_TAG}-build.${GITHUB_RUN_NUMBER}-${VERSION_SAFE}" >> $GITHUB_OUTPUT
+          DATE_TAG="$(date +"%Y%m%d-%H%M")"
+          echo "release_tag=${VERSION_SAFE}-build${GITHUB_RUN_NUMBER}-${DATE_TAG}" >> $GITHUB_OUTPUT
           echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Summarize artifacts
