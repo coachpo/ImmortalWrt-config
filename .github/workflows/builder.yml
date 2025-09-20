@@ -176,7 +176,7 @@ jobs:
             JOBS="${JOBS_INPUT}"
           fi
         fi
-        echo -e "${JOBS} thread compile"
+        printf "%s thread compile\n" "${JOBS}"
         if [ "${DEBUG_BUILD}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
         make -j"${JOBS}" ${VERBOSE_FLAG} \
           || make -j1 ${VERBOSE_FLAG} \
