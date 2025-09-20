@@ -43,7 +43,7 @@ permissions:
   contents: read
 
 env:
-  IMMORTALWRT_TAG: ${{ vars.IMMORTALWRT_TAG }}
+  IMMORTALWRT_REF: ${{ vars.IMMORTALWRT_REF }}
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
@@ -74,11 +74,6 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 1
-
-    - name: Record submodule revision
-      id: immortalwrt_ref
-      run: |
-        echo "IMMORTALWRT_REF=$(git -C immortalwrt rev-parse HEAD)" >> $GITHUB_ENV
 
     - name: Ensure workspace
       run: |
