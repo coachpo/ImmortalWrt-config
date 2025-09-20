@@ -261,7 +261,7 @@ jobs:
 
       - name: Summarize artifacts
         run: |
-          printf "ImmortalWrt firmware for\n- Cudy TR3000 (Filogic)\n- Xiaomi CR6606 (MT7621)\n\nBased on: ${IMMORTALWRT_REF}\n" > release.md
+          printf "ImmortalWrt ${IMMORTALWRT_REF} firmware for\n- Cudy TR3000 (Filogic)\n- Xiaomi CR6606 (MT7621)\n" > release.md
           cat release.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload firmware to release (combined)
