@@ -48,6 +48,7 @@ env:
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
   CCACHE_MAX_SIZE: 4G
+  FORCE_UNSAFE_CONFIGURE: 1
   # Notification settings
   BARK_SERVER_URL: ${{ secrets.BARK_SERVER_URL }}
   BARK_SUCCESS_SOUND: "birdsong"
