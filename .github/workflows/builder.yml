@@ -115,12 +115,11 @@ jobs:
 
     - name: Configure Git safe directories
       run: |
-        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder
-        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt
-        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/packages
-        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/luci
-        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/routing
-        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/telephony
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        git config --global --add safe.directory "$GITHUB_WORKSPACE/immortalwrt"
+        for d in packages luci routing telephony; do
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/immortalwrt/feeds/$d" || true
+        done
 
     - name: Update feeds
       run: |
@@ -143,7 +142,7 @@ jobs:
 
     - name: Prepare model config
       run: |
-        cp "${{ github.workspace }}/${{ matrix.model }}/seed.config" immortalwrt/.config
+        cp "${{ matrix.model }}/seed.config" immortalwrt/.config
 
     - name: Generate config
       run: |
