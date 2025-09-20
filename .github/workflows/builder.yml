@@ -75,6 +75,11 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
+    - name: Record submodule revision
+      id: immortalwrt_ref
+      run: |
+        echo "IMMORTALWRT_REF=$(git -C immortalwrt rev-parse HEAD)" >> $GITHUB_ENV
+
     - name: Ensure workspace
       run: |
         mkdir -p /workdir || true
@@ -84,20 +89,20 @@ jobs:
       with:
         swap-size-gb: 6
 
-    - name: Restore ccache cache (per model/tag)
+    - name: Restore ccache cache (per model/ref)
       uses: actions/cache@v4
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_TAG }}
+        key: ${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}
         restore-keys: |
           ${{ runner.os }}-ccache-${{ matrix.model }}-
           ${{ runner.os }}-ccache-
 
-    - name: Restore OpenWrt downloads cache (per model/tag)
+    - name: Restore OpenWrt downloads cache (per model/ref)
       uses: actions/cache@v4
       with:
         path: immortalwrt/dl
-        key: ${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_TAG }}
+        key: ${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}
         restore-keys: |
           ${{ runner.os }}-dl-${{ matrix.model }}-
           ${{ runner.os }}-dl-
@@ -106,6 +111,14 @@ jobs:
       run: |
         echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
         ccache -M ${CCACHE_MAX_SIZE}
+
+    - name: Restore feeds cache (per ref + feeds.conf)
+      uses: actions/cache@v4
+      with:
+        path: immortalwrt/feeds
+        key: ${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}
+        restore-keys: |
+          ${{ runner.os }}-feeds-
 
     - name: Update feeds
       run: |
@@ -121,10 +134,32 @@ jobs:
       run: |
         cp "${{ matrix.model }}/seed.config" immortalwrt/.config
 
+    - name: Compute seed hash (for build caches)
+        
+      run: |
+        echo "SEED_HASH=$(sha256sum \"${{ matrix.model }}/seed.config\" | cut -d ' ' -f1)" >> $GITHUB_ENV
+
     - name: Generate config
       run: |
         cd immortalwrt
         make defconfig
+
+    - name: Restore staging_dir cache (per model/ref/seed)
+      uses: actions/cache@v4
+      with:
+        path: immortalwrt/staging_dir
+        key: ${{ runner.os }}-staging-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ env.SEED_HASH }}
+        restore-keys: |
+          ${{ runner.os }}-staging-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-
+          ${{ runner.os }}-staging-${{ matrix.model }}-
+
+    - name: Restore host tools cache (per ref)
+      uses: actions/cache@v4
+      with:
+        path: immortalwrt/build_dir/host
+        key: ${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}
+        restore-keys: |
+          ${{ runner.os }}-host-
 
     - name: Compile the firmware
       id: compile
