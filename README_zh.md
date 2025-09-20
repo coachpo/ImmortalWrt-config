@@ -4,7 +4,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/coachpo/immortalwrt-firmware-builder?sort=semver)](https://github.com/coachpo/immortalwrt-firmware-builder/releases/latest)
 [![Downloads (latest)](https://img.shields.io/github/downloads/coachpo/immortalwrt-firmware-builder/latest/total)](https://github.com/coachpo/immortalwrt-firmware-builder/releases/latest)
 
-[English](README.md) | 中文
+[English](README.md) | 简体中文
 
 用于从固定版本构建并（可选）发布 Cudy TR3000 和小米 CR6606 的 ImmortalWrt 固件的种子配置与 GitHub Actions 工作流。
 
