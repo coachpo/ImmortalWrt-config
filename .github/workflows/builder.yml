@@ -163,6 +163,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-host-
 
+    - name: Remove localized default settings (Chinese)
+      run: rm -f immortalwrt/package/emortal/default-settings/files/99-default-settings-chinese
+
     - name: Compile the firmware
       id: compile
       run: |
