@@ -49,7 +49,6 @@ env:
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
   CCACHE_MAX_SIZE: 4G
   # Notification settings
-  BARK_SERVER_URL: ${{ secrets.BARK_SERVER_URL }}
   BARK_SUCCESS_SOUND: "birdsong"
   BARK_FAILURE_SOUND: "calypso"
   BARK_ICON: "https://firmware-selector.immortalwrt.org/favicon.ico"
@@ -290,9 +289,9 @@ jobs:
           on_status: success, failure, cancelled
           title: "${{ ((env.UPLOAD_RELEASE == 'true' && needs.release.result == 'success') || (env.UPLOAD_RELEASE != 'true' && needs.build.result == 'success')) && '🚀 ImmortalWrt: Success' || '❌ ImmortalWrt: Failed' }}"
           body: "${{ (env.UPLOAD_RELEASE == 'true' && needs.release.result == 'success') && '✅ Build + Release completed successfully!' || (env.UPLOAD_RELEASE != 'true' && needs.build.result == 'success') && '✅ Build completed successfully!' || format('💥 Failed: build={0}, release={1}', needs.build.result, needs.release.result) }}"
+          bark_server_url: ${{ secrets.BARK_SERVER_URL }}
           device_key: ${{ secrets.BARK_DEVICE_KEY }}
           level: active
           sound: ${{ ((env.UPLOAD_RELEASE == 'true' && needs.release.result == 'success') || (env.UPLOAD_RELEASE != 'true' && needs.build.result == 'success')) && env.BARK_SUCCESS_SOUND || env.BARK_FAILURE_SOUND }}
           icon: ${{ env.BARK_ICON }}
           group: ${{ env.BARK_GROUP }}
-          bark_server_url: ${{ env.BARK_SERVER_URL }}
