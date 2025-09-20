@@ -53,18 +53,16 @@ This table compares the features enabled by both seed configurations.
 | ✅ | ✅ | UPnP IGD | Auto port forwarding (miniupnpd-nftables) + Chinese UI | |
 | ✅ | ✅ | DoH via Cloudflared | DNS over HTTPS tunnel with LuCI UI + Chinese UI | |
 | ✅ | ✅ | HTTPS DNS Proxy | Lightweight DoH client with LuCI UI + Chinese UI | |
-| ✅ | ✅ | SmartDNS | Fast DNS with filtering and cache + Chinese UI | |
 | ✅ | ✅ | Adblock | DNS-based ad/malware blocking + Chinese UI | |
 | ✅ | ✅ | DNS/DHCP backend | Full-featured dnsmasq (DNSSEC, DHCPv6, TFTP, auth) | |
 | ✅ | ✅ | TLS/crypto | OpenSSL TLS backend (curl/wget-ssl) with system OpenSSL config | |
 | ✅ | ✅ | IPv6 support | DHCPv6 and IPv6 DHCP services (odhcp6c, odhcpd) | |
 | ✅ | ✅ | Firewall | nftables-based firewall4 | |
 | ✅ | ✅ | CA certificates | Root certificate bundle for TLS validation | |
-| ✅ | ✅ | DNS tools | BIND client tools (host, dig) with DoH support | |
 | ✅ | ✅ | Online Users | Show online client list + Chinese UI | |
 | ✅ | ✅ | Package Manager UI | Manage packages in LuCI + Chinese UI | |
 | ✅ | ✅ | Temperature monitoring | System temperature status in LuCI | TR3000: CPU + Wi‑Fi; CR6606: Wi‑Fi only |
-| ✅ | ✅ | Push notifications | Push notification service (luci-app-pushbot) | |
+| ✅ | ✅ | Push notifications | WeChat/Telegram/Mail notifications for real-time router alerts including IP changes, device connections, traffic monitoring, CPU/temperature status, and security alerts.(luci-app-wechatpush) | |
 | ✅ | ✅ | Network tools | socat with LuCI interface + Chinese UI | |
 | ✅ | ✅ | Advanced networking | Extensive networking tools (curl, wget, arping, etc.) | |
 | ✅ | ✅ | Editor (vim) | Full-featured CLI editor | |
@@ -75,7 +73,6 @@ This table compares the features enabled by both seed configurations.
 | ❌ | ✅ | USB networking | Extensive USB-to-Ethernet adapter support | CR6606 lacks USB ports |
 | ❌ | ✅ | USB tools | USB utilities and device identification | CR6606 lacks USB ports |
 | ❌ | ✅ | File manager | Web file manager in LuCI + Chinese UI | CR6606 lacks USB ports |
-
 
 
 ## License
