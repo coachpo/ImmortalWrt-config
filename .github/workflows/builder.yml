@@ -62,11 +62,17 @@ jobs:
       contents: read
       actions: write
     runs-on: ubuntu-latest
-    container: ghcr.io/openwrt/buildbot/buildworker-v3.11.8:v23
+    container:
+      image: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
         model: ${{ fromJSON((github.event.inputs.model == '' || github.event.inputs.model == 'all') && '["cr6606","tr3000"]' || format('["{0}"]', github.event.inputs.model)) }}
+        include:
+          - model: cr6606
+            container: ghcr.io/openwrt/toolchain:ramips-mt7621-openwrt-24.10
+          - model: tr3000
+            container: ghcr.io/openwrt/toolchain:mediatek-filogic-openwrt-24.10
 
     steps:
     - name: Checkout repository (with submodules)
