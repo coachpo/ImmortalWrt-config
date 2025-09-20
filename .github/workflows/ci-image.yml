@@ -1,4 +1,4 @@
-name: Build and Push Build Environment Image
+name: Build and Push Environment Image
 
 on:
   workflow_dispatch:
