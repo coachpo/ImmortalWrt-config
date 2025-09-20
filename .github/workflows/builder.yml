@@ -113,6 +113,15 @@ jobs:
         restore-keys: |
           ccache-${{ runner.os }}-${{ env.IMMORTALWRT_TAG }}-
 
+    - name: Configure Git safe directories
+      run: |
+        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder
+        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt
+        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/packages
+        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/luci
+        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/routing
+        git config --global --add safe.directory /__w/immortalwrt-firmware-builder/immortalwrt-firmware-builder/immortalwrt/feeds/telephony
+
     - name: Update feeds
       run: |
         cd immortalwrt
