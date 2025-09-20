@@ -32,6 +32,7 @@ jobs:
           sbom: false
           tags: |
             ghcr.io/${{ github.repository_owner }}/immortalwrt-firmware-builder-ci:latest
+            ghcr.io/${{ github.repository_owner }}/immortalwrt-firmware-builder-ci:v${{ github.run_number }}
 
       - name: Delete workflow runs (best-effort)
         uses: Mattraks/delete-workflow-runs@main
