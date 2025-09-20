@@ -89,6 +89,17 @@ RUN apt-get update -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a non-root user and set as default
+ARG USERNAME=builder
+ARG USER_UID=1000
+ARG USER_GID=${USER_UID}
+RUN groupadd --gid ${USER_GID} ${USERNAME} \
+    && useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME} \
+    && mkdir -p /workdir \
+    && chown -R ${USER_UID}:${USER_GID} /workdir
+ENV HOME=/home/${USERNAME}
+USER ${USERNAME}
+
 WORKDIR /workdir
 
 
