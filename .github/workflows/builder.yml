@@ -74,16 +74,7 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 1
-
-    - name: Ensure workspace
-      run: |
-        mkdir -p /workdir || true
-
-    - name: Adjust swap space to 6GB
-      uses: pierotofy/set-swap-space@v1.0
-      with:
-        swap-size-gb: 6
-
+        
     - name: Restore ccache cache (per model/ref)
       uses: actions/cache@v4
       with:
