@@ -169,19 +169,10 @@ jobs:
           fi
         fi
         echo -e "${JOBS} thread compile"
-        export CCACHE_DIR="$HOME/.ccache"
-        which ccache && ccache --set-config=max_size=${CCACHE_MAX_SIZE} || true
-        which ccache && ccache --set-config=compression=true || true
-        which ccache && ccache --set-config=compression_level=6 || true
-        which ccache && (ccache --show-config || ccache --print-config) || true
-        which ccache && ccache --zero-stats || true
-        echo "Go build cache dir:" $(go env GOCACHE 2>/dev/null || echo "(no go)") || true
-        echo "Go module cache dir:" $(go env GOMODCACHE 2>/dev/null || echo "(no go)") || true
         if [ "${DEBUG_BUILD}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
-        clean_make() { env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME="$HOME" CCACHE_DIR="$HOME/.ccache" make "$@"; }
-        clean_make -j"${JOBS}" ${VERBOSE_FLAG} \
-          || clean_make -j1 ${VERBOSE_FLAG} \
-          || clean_make -j1 V=s
+        make -j"${JOBS}" ${VERBOSE_FLAG} \
+          || make -j1 ${VERBOSE_FLAG} \
+          || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
