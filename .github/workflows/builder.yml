@@ -193,7 +193,7 @@ jobs:
         echo "Go build cache dir:" $(go env GOCACHE 2>/dev/null || echo "(no go)") || true
         echo "Go module cache dir:" $(go env GOMODCACHE 2>/dev/null || echo "(no go)") || true
         if [ "${DEBUG_BUILD}" = "true" ]; then VERBOSE_FLAG='V=sc'; else VERBOSE_FLAG=''; fi
-        clean_make() { env -i LC_ALL=C PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME="$HOME" CCACHE_DIR="$HOME/.ccache" make "$@"; }
+        clean_make() { env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME="$HOME" CCACHE_DIR="$HOME/.ccache" make "$@"; }
         clean_make -j"${JOBS}" ${VERBOSE_FLAG} \
           || clean_make -j1 ${VERBOSE_FLAG} \
           || clean_make -j1 V=s
