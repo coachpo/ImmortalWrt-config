@@ -181,7 +181,6 @@ jobs:
         name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
         path: ${{ steps.collect.outputs.files }}
         retention-days: 30
-
     - name: Delete workflow runs (best-effort)
       uses: Mattraks/delete-workflow-runs@main
       if: ${{ always() }}
@@ -323,3 +322,4 @@ jobs:
                 "group": "${{ env.BARK_GROUP }}"
               }'
           fi
+
