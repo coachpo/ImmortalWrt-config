@@ -4,6 +4,8 @@
 [![Latest Release](https://img.shields.io/github/v/release/coachpo/immortalwrt-firmware-builder?sort=semver)](https://github.com/coachpo/immortalwrt-firmware-builder/releases/latest)
 [![Downloads (latest)](https://img.shields.io/github/downloads/coachpo/immortalwrt-firmware-builder/latest/total)](https://github.com/coachpo/immortalwrt-firmware-builder/releases/latest)
 
+[English](README.md) | [简体中文](README_zh.md)
+
 Seed configs and a GitHub Actions workflow to build and optionally release ImmortalWrt firmware for Cudy TR3000 and Xiaomi CR6606 from a pinned tag.
 
 - Cudy TR3000 (Filogic) 
