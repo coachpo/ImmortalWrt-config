@@ -79,22 +79,10 @@ jobs:
       run: |
         mkdir -p /workdir || true
 
-    - name: Setup 6G swap
-      if: runner.os == 'Linux'
-      continue-on-error: true
-      run: |
-        if [ -f /swapfile ]; then
-          swapon --show || true
-          exit 0
-        fi
-        if ! fallocate -l 6G /swapfile 2>/dev/null; then
-          dd if=/dev/zero of=/swapfile bs=1M count=6144
-        fi
-        chmod 600 /swapfile
-        mkswap /swapfile
-        swapon /swapfile
-        swapon --show || true
-        free -h || true
+    - name: Set Swap Space
+      uses: pierotofy/set-swap-space@v1.0
+      with:
+        swap-size-gb: 6
 
     - name: Restore ccache cache (per model/tag)
       uses: actions/cache@v4
