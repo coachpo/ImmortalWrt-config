@@ -261,10 +261,8 @@ jobs:
 
       - name: Summarize artifacts
         run: |
-          printf "Artifacts included in release (by model):\n\ntr3000:\n" > release.txt
-          ls -lh release/tr3000 || true >> release.txt
-          printf "\ncr6606:\n" >> release.txt
-          ls -lh release/cr6606 || true >> release.txt
+          printf "ImmortalWrt firmware for\n- Cudy TR3000 (Filogic)\n- Xiaomi CR6606 (MT7621)\n\nBased on: ${IMMORTALWRT_REF}\n" > release.md
+          cat release.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload firmware to release (combined)
         uses: softprops/action-gh-release@v2
@@ -273,7 +271,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
-          body_path: release.txt
+          body_path: release.md
           files: |
             release/tr3000/*
             release/cr6606/*
