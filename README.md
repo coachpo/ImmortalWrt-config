@@ -59,14 +59,11 @@ This table compares the features enabled by both seed configurations.
 | ✅ | ✅ | IPv6 support | DHCPv6 and IPv6 DHCP services (odhcp6c, odhcpd) | |
 | ✅ | ✅ | Firewall | nftables-based firewall4 | |
 | ✅ | ✅ | CA certificates | Root certificate bundle for TLS validation | |
-| ✅ | ✅ | Online Users | Show online client list + Chinese UI | |
 | ✅ | ✅ | Package Manager UI | Manage packages in LuCI + Chinese UI | |
-| ✅ | ✅ | Temperature monitoring | System temperature status in LuCI | TR3000: CPU + Wi‑Fi; CR6606: Wi‑Fi only |
-| ✅ | ✅ | Push notifications | WeChat/Telegram/Mail notifications for real-time router alerts including IP changes, device connections, traffic monitoring, CPU/temperature status, and security alerts.(luci-app-wechatpush) | |
 | ✅ | ✅ | Network tools | socat with LuCI interface + Chinese UI | |
 | ✅ | ✅ | Advanced networking | Extensive networking tools (curl, wget, arping, etc.) | |
 | ✅ | ✅ | Editor (vim) | Full-featured CLI editor | |
-| ❌ | ✅ | File sharing | Samba4 server with Avahi, NetBIOS, VFS, and WSDD2 + Chinese UI | |
+| ❌ | ✅ | File sharing | Samba4 server with Avahi, NetBIOS, VFS, and WSDD2 + Chinese UI | CR6606 lacks USB ports |
 | ❌ | ✅ | USB printing | Print server (p910nd JetDirect) with LuCI UI + Chinese UI | CR6606 lacks USB ports |
 | ❌ | ✅ | Disk management | LuCI disk manager with Btrfs, NTFS3 support + Chinese UI | CR6606 lacks USB ports |
 | ❌ | ✅ | Storage & filesystems | Full filesystem support (ext4, Btrfs, exFAT, NTFS3) | CR6606 lacks USB ports |
