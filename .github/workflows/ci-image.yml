@@ -34,16 +34,6 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/immortalwrt-firmware-builder-ci:latest
             ghcr.io/${{ github.repository_owner }}/immortalwrt-firmware-builder-ci:v${{ github.run_number }}
 
-      - name: Delete workflow runs (best-effort)
-        uses: Mattraks/delete-workflow-runs@main
-        if: ${{ always() }}
-        continue-on-error: true
-        with:
-          retain_days: 0
-          keep_minimum_runs: 2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   cleanup-untagged:
     runs-on: ubuntu-latest
     needs: [ docker ]

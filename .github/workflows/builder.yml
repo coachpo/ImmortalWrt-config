@@ -200,16 +200,6 @@ jobs:
         name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
         path: ${{ steps.collect.outputs.files }}
         retention-days: 30
-    - name: Delete workflow runs (best-effort)
-      uses: Mattraks/delete-workflow-runs@main
-      if: ${{ always() }}
-      continue-on-error: true
-      with:
-        retain_days: 0
-        keep_minimum_runs: 2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Remove old Releases
       uses: dev-drprasad/delete-older-releases@master
       if: ${{ github.event.inputs.upload_release == 'true' && !cancelled() }}

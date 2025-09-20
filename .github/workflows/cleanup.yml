@@ -1,0 +1,22 @@
+name: Scheduled Cleanup Workflow Runs
+
+on:
+  schedule:
+    # Run every day at 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup-workflow-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@v2.0.6
+        with:
+          retain_days: 0
+          keep_minimum_runs: 3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
