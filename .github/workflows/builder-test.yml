@@ -57,9 +57,9 @@ jobs:
         model: ${{ fromJSON((github.event.inputs.model == '' || github.event.inputs.model == 'all') && '["cr6606","tr3000"]' || format('["{0}"]', github.event.inputs.model)) }}
         include:
           - model: cr6606
-            container: ghcr.io/openwrt/toolchain:ramips-mt7621-openwrt-24.10
+            container: ghcr.io/openwrt/buildbot/buildworker-v3.8.0:v9
           - model: tr3000
-            container: ghcr.io/openwrt/toolchain:mediatek-filogic-openwrt-24.10
+            container: ghcr.io/openwrt/buildbot/buildworker-v3.8.0:v9
 
     steps:
     - name: Checkout repository (with submodules)
