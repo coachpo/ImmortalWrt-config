@@ -91,8 +91,8 @@ RUN apt-get update -y \
 
 # Create a non-root user and set as default
 ARG USERNAME=builder
-ARG USER_UID=1000
-ARG USER_GID=${USER_UID}
+ARG USER_UID=1001
+ARG USER_GID=121
 RUN groupadd --gid ${USER_GID} ${USERNAME} \
     && useradd --uid ${USER_UID} --gid ${USER_GID} -m -s /bin/bash ${USERNAME} \
     && mkdir -p /workdir \
