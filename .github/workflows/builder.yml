@@ -58,7 +58,7 @@ jobs:
   build:
     name: Build (${{ matrix.model }})
     permissions:
-      contents: read
+      contents: write
       actions: write
     runs-on: ubuntu-latest
     container: ghcr.io/coachpo/immortalwrt-build-env:latest
@@ -128,6 +128,43 @@ jobs:
         echo "SEED_HASH=$HASH" >> $GITHUB_ENV
         echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
 
+    - name: Restore repo cache (release tarball)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -e
+        CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
+        CACHE_NAME="repo-cache.tar.xz"
+        echo "Attempting to restore cache: tag=${CACHE_TAG}, asset=${CACHE_NAME}"
+        URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${CACHE_TAG}/${CACHE_NAME}"
+        if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o "${CACHE_NAME}" "${URL}"; then
+          echo "Cache found. Extracting..."
+          # Extract only heavy build outputs to avoid clobbering sources/feeds
+          tar -xJf "${CACHE_NAME}" \
+            immortalwrt/build_dir \
+            immortalwrt/staging_dir \
+            immortalwrt/dl \
+            immortalwrt/bin \
+            immortalwrt/.ccache || true
+          echo "Cache restored from ${CACHE_TAG}."
+        else
+          echo "No seed-specific cache found for ${CACHE_TAG}. Trying generic fallback..."
+          GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
+          GENERIC_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GENERIC_TAG}/${CACHE_NAME}"
+          if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o "${CACHE_NAME}" "${GENERIC_URL}"; then
+            echo "Generic cache found (${GENERIC_TAG}). Extracting..."
+            tar -xJf "${CACHE_NAME}" \
+              immortalwrt/build_dir \
+              immortalwrt/staging_dir \
+              immortalwrt/dl \
+              immortalwrt/bin \
+              immortalwrt/.ccache || true
+            echo "Cache restored from generic tag ${GENERIC_TAG}."
+          else
+            echo "No generic cache found for ${GENERIC_TAG}. Proceeding with cold build."
+          fi
+        fi
+
     - name: Generate config (enable ccache)
       run: |
         cd immortalwrt
@@ -183,6 +220,50 @@ jobs:
           || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
+
+    - name: Create and upload repo cache (release tarball)
+      if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -e
+        CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
+        CACHE_NAME="repo-cache.tar.xz"
+        echo "Creating repo cache tarball: ${CACHE_NAME}"
+        # Create at repo root; exclude VCS metadata
+        tar -cJf "${CACHE_NAME}" --exclude=.git .
+
+        API_BASE="https://api.github.com"
+        echo "Ensuring release '${CACHE_TAG}' exists..."
+        if ! curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases/tags/${CACHE_TAG}" -o release.json; then
+          PAYLOAD=$(printf '{"tag_name":"%s","name":"%s","prerelease":true,"make_latest":"false"}' "${CACHE_TAG}" "${CACHE_TAG}")
+          curl -fsSL -X POST -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" -d "${PAYLOAD}" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases" -o release.json
+        fi
+        UPLOAD_URL=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' release.json | head -n1)
+        UPLOAD_URL="${UPLOAD_URL%\{*}"
+        echo "Uploading ${CACHE_NAME} to ${UPLOAD_URL}?name=${CACHE_NAME}"
+        curl -fsSL -X POST \
+          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Content-Type: application/x-xz" \
+          --data-binary @"${CACHE_NAME}" \
+          "${UPLOAD_URL}?name=${CACHE_NAME}"
+        echo "Repo cache uploaded as release asset under tag ${CACHE_TAG}."
+
+        # Also attempt to upload/update a generic cache for broader reuse (best-effort)
+        GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
+        echo "Ensuring generic release '${GENERIC_TAG}' exists..."
+        if ! curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases/tags/${GENERIC_TAG}" -o generic_release.json; then
+          PAYLOAD=$(printf '{"tag_name":"%s","name":"%s","prerelease":true,"make_latest":"false"}' "${GENERIC_TAG}" "${GENERIC_TAG}")
+          curl -fsSL -X POST -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" -d "${PAYLOAD}" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases" -o generic_release.json || true
+        fi
+        UPLOAD_URL_GEN=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' generic_release.json | head -n1)
+        UPLOAD_URL_GEN="${UPLOAD_URL_GEN%\{*}"
+        echo "Uploading generic cache ${CACHE_NAME} to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort)"
+        curl -fsSL -X POST \
+          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "Content-Type: application/x-xz" \
+          --data-binary @"${CACHE_NAME}" \
+          "${UPLOAD_URL_GEN}?name=${CACHE_NAME}" || echo "Generic cache upload skipped/failed; continuing."
 
     - name: Check space usage
       if: ${{ !cancelled() }}
