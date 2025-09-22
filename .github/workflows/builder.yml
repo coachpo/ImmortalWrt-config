@@ -129,10 +129,12 @@ jobs:
         echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
 
     - name: Restore repo cache (release tarball)
+      id: restore_repo_cache
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -e
+        HIT="false"
         CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
         CACHE_NAME="repo-cache.tar.xz"
         echo "Attempting to restore cache: tag=${CACHE_TAG}, asset=${CACHE_NAME}"
@@ -147,6 +149,7 @@ jobs:
             immortalwrt/bin \
             immortalwrt/.ccache || true
           echo "Cache restored from ${CACHE_TAG}."
+          HIT="true"
         else
           echo "No seed-specific cache found for ${CACHE_TAG}. Trying generic fallback..."
           GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
@@ -160,10 +163,12 @@ jobs:
               immortalwrt/bin \
               immortalwrt/.ccache || true
             echo "Cache restored from generic tag ${GENERIC_TAG}."
+            HIT="true"
           else
             echo "No generic cache found for ${GENERIC_TAG}. Proceeding with cold build."
           fi
         fi
+        echo "hit=${HIT}" >> $GITHUB_OUTPUT
 
     - name: Generate config (enable ccache)
       run: |
@@ -172,6 +177,7 @@ jobs:
         make defconfig
 
     - name: Restore toolchain caches (per model/ref)
+      if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
       uses: actions/cache@v4
       with:
         path: |
@@ -182,6 +188,7 @@ jobs:
           ${{ runner.os }}-toolchain-${{ matrix.model }}-
 
     - name: Restore target caches (per model/ref/seed)
+      if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
       uses: actions/cache@v4
       with:
         path: |
@@ -193,6 +200,7 @@ jobs:
           ${{ runner.os }}-target-${{ matrix.model }}-
 
     - name: Restore host tools cache (per ref)
+      if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
       uses: actions/cache@v4
       with:
         path: immortalwrt/build_dir/host
