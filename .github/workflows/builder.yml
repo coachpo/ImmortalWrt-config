@@ -34,6 +34,11 @@ on:
           - all
           - cr6606
           - tr3000
+      immortalwrt_ref:
+        description: 'ImmortalWrt git ref (branch, tag, or commit SHA)'
+        type: string
+        required: false
+        default: ''
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -43,7 +48,7 @@ permissions:
   contents: read
 
 env:
-  IMMORTALWRT_REF: ${{ vars.IMMORTALWRT_REF }}
+  IMMORTALWRT_REF: ${{ github.event.inputs.immortalwrt_ref || vars.IMMORTALWRT_REF }}
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
@@ -73,6 +78,25 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 1
+
+    - name: Set ImmortalWrt submodule to requested ref
+      if: ${{ env.IMMORTALWRT_REF != '' }}
+      run: |
+        set -e
+        echo "Switching submodule 'immortalwrt' to ref: ${IMMORTALWRT_REF}"
+        git -C immortalwrt fetch --all --tags --prune
+        # Try ref as is; if not found, try origin/REF for branches
+        if git -C immortalwrt rev-parse --verify --quiet "${IMMORTALWRT_REF}^{commit}"; then
+          TARGET_REF="${IMMORTALWRT_REF}"
+        elif git -C immortalwrt rev-parse --verify --quiet "origin/${IMMORTALWRT_REF}^{commit}"; then
+          TARGET_REF="origin/${IMMORTALWRT_REF}"
+        else
+          echo "Ref '${IMMORTALWRT_REF}' not found in submodule. Available heads and tags:" >&2
+          git -C immortalwrt show-ref --heads --tags | sed 's/^/  /' >&2 || true
+          exit 1
+        fi
+        git -C immortalwrt checkout --recurse-submodules --detach "${TARGET_REF}"
+        git -C immortalwrt submodule update --init --recursive --depth=1
         
     - name: Prepare ccache dir
       run: mkdir -p immortalwrt/.ccache
