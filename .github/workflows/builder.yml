@@ -41,7 +41,7 @@ on:
         default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.model || 'all' }}-${{ (github.event.inputs.immortalwrt_ref && github.event.inputs.immortalwrt_ref) || (vars.IMMORTALWRT_REF && vars.IMMORTALWRT_REF) || 'default' }}
   cancel-in-progress: true
 
 permissions:
