@@ -152,7 +152,7 @@ jobs:
         echo "SEED_HASH=$HASH" >> $GITHUB_ENV
         echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
 
-    - name: "Restore repo cache (release asset: zip)"
+    - name: "Restore repo cache from previous successful runs' artifacts"
       id: restore_repo_cache
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -161,103 +161,84 @@ jobs:
         set -e
         set -o pipefail
         HIT="false"
-        CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
-        echo "Attempting to restore cache: tag=${CACHE_TAG} (zip)"
-        URL_ZIP="https://github.com/${GITHUB_REPOSITORY}/releases/download/${CACHE_TAG}/repo-cache.zip"
-        if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o repo-cache.zip "${URL_ZIP}"; then
-          echo "Downloaded zip cache; extracting..."
-          if command -v unzip >/dev/null 2>&1; then
-            unzip -o -q repo-cache.zip || true
-          elif command -v bsdtar >/dev/null 2>&1; then
-            bsdtar -xf repo-cache.zip || true
-          elif command -v python3 >/dev/null 2>&1; then
-            python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')" repo-cache.zip || true
-          else
-            echo "No unzip utility available; skipping zip extraction." >&2
-          fi
-          rm -f repo-cache.zip || true
-          # If extracted zip contains the known top-level artifact folder, move its immortalwrt/* content into place
-          EXPECTED_ROOT="repo-cache-dirs-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
-          if [ -d "${EXPECTED_ROOT}" ]; then
-            ROOT_DIR_CAND="${EXPECTED_ROOT}"
-          else
-            ROOT_DIR_CAND=$(find . -maxdepth 1 -mindepth 1 -type d -name "repo-cache-dirs-*" | head -n1 || true)
-          fi
-          if [ -n "${ROOT_DIR_CAND}" ] && [ -d "${ROOT_DIR_CAND}/immortalwrt" ]; then
-            echo "Relocating restored cache directories from ${ROOT_DIR_CAND} into workspace..."
-            mkdir -p immortalwrt
-            for p in .ccache dl build_dir/host staging_dir/host; do
-              if [ -d "${ROOT_DIR_CAND}/immortalwrt/${p}" ]; then
-                mkdir -p "immortalwrt/${p}"
-                rsync -a "${ROOT_DIR_CAND}/immortalwrt/${p}/" "immortalwrt/${p}/" || true
-              fi
-            done
-            for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/toolchain-*; do
-              [ -d "${m}" ] || continue
-              base=$(basename "${m}")
-              mkdir -p "immortalwrt/build_dir/${base}"
-              rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
-            done
-            for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/toolchain-*; do
-              [ -d "${m}" ] || continue
-              base=$(basename "${m}")
-              mkdir -p "immortalwrt/staging_dir/${base}"
-              rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
-            done
-            rm -rf "${ROOT_DIR_CAND}" || true
-          fi
-          echo "Cache restored from ${CACHE_TAG} (zip)."
-          HIT="true"
-        else
-          echo "No seed-specific cache found for ${CACHE_TAG}. Trying generic fallback..."
-          GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
-          URL_ZIP_GEN="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GENERIC_TAG}/repo-cache.zip"
-          if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o repo-cache.zip "${URL_ZIP_GEN}"; then
-            echo "Downloaded generic zip cache; extracting..."
-            if command -v unzip >/dev/null 2>&1; then
-              unzip -o -q repo-cache.zip || true
-            elif command -v bsdtar >/dev/null 2>&1; then
-              bsdtar -xf repo-cache.zip || true
-            elif command -v python3 >/dev/null 2>&1; then
-              python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')" repo-cache.zip || true
-            else
-              echo "No unzip utility available; skipping zip extraction." >&2
-            fi
-            rm -f repo-cache.zip || true
-            EXPECTED_ROOT="repo-cache-dirs-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
-            if [ -d "${EXPECTED_ROOT}" ]; then
-              ROOT_DIR_CAND="${EXPECTED_ROOT}"
-            else
-              ROOT_DIR_CAND=$(find . -maxdepth 1 -mindepth 1 -type d -name "repo-cache-dirs-*" | head -n1 || true)
-            fi
-            if [ -n "${ROOT_DIR_CAND}" ] && [ -d "${ROOT_DIR_CAND}/immortalwrt" ]; then
-              echo "Relocating restored cache directories from ${ROOT_DIR_CAND} into workspace..."
-              mkdir -p immortalwrt
-              for p in .ccache dl build_dir/host staging_dir/host; do
-                if [ -d "${ROOT_DIR_CAND}/immortalwrt/${p}" ]; then
-                  mkdir -p "immortalwrt/${p}"
-                  rsync -a "${ROOT_DIR_CAND}/immortalwrt/${p}/" "immortalwrt/${p}/" || true
+        EXPECTED_ART_NAME="repo-cache-dirs-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
+
+        # Try restoring from last successful workflow runs' artifacts (up to 3 previous runs)
+        if [ -n "${GITHUB_TOKEN}" ]; then
+          # Derive workflow file path for API (prefer from GITHUB_WORKFLOW_REF; fallback to file name)
+          WF_PATH=$(echo "${GITHUB_WORKFLOW_REF}" | sed -n 's#^[^/]*/[^/]*/\(.github/workflows/[^@]*\)@.*#\1#p')
+          if [ -z "${WF_PATH}" ]; then WF_PATH="builder.yml"; fi
+          for i in 1 2 3; do
+            TARGET=$((GITHUB_RUN_NUMBER - i))
+            if [ "${TARGET}" -le 0 ]; then continue; fi
+            echo "Trying to restore from previous successful run #${TARGET} (attempt ${i}/3)..."
+            RUNS_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${WF_PATH}/runs?per_page=100"
+            RESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${RUNS_URL}" || true)
+            if [ -n "${RESP}" ]; then
+              RUN_ID=$(TARGET="${TARGET}" python3 -c 'import json,os,sys; d=json.loads(sys.stdin.read() or "{}"); t=int(os.environ.get("TARGET","0") or "0"); print(next((str(r.get("id","")) for r in d.get("workflow_runs", []) if r.get("run_number")==t and r.get("conclusion")=="success"), ""))' <<< "${RESP}")
+              if [ -n "${RUN_ID}" ]; then
+                ART_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"
+                ARESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${ART_URL}" || true)
+                if [ -n "${ARESP}" ]; then
+                  ART_ID=$(EXPECT="${EXPECTED_ART_NAME}" python3 -c 'import json,os,sys; e=os.environ.get("EXPECT",""); d=json.loads(sys.stdin.read() or "{}"); print(next((str(a.get("id","")) for a in d.get("artifacts", []) if a.get("name")==e and not a.get("expired", False)), ""))' <<< "${ARESP}")
+                  if [ -n "${ART_ID}" ]; then
+                    echo "Found matching artifact '${EXPECTED_ART_NAME}' (id=${ART_ID}) in run #${TARGET}; downloading..."
+                    curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -L -o repo-cache.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip"
+                    if [ -s repo-cache.zip ]; then
+                      echo "Extracting previous-run artifact zip..."
+                      if command -v unzip >/dev/null 2>&1; then
+                        unzip -o -q repo-cache.zip || true
+                      elif command -v bsdtar >/dev/null 2>&1; then
+                        bsdtar -xf repo-cache.zip || true
+                      elif command -v python3 >/dev/null 2>&1; then
+                        python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')" repo-cache.zip || true
+                      else
+                        echo "No unzip utility available; skipping zip extraction." >&2
+                      fi
+                      rm -f repo-cache.zip || true
+                      # If extracted zip contains the known top-level artifact folder, move its immortalwrt/* content into place
+                      EXPECTED_ROOT="${EXPECTED_ART_NAME}"
+                      if [ -d "${EXPECTED_ROOT}" ]; then
+                        ROOT_DIR_CAND="${EXPECTED_ROOT}"
+                      else
+                        ROOT_DIR_CAND=$(find . -maxdepth 1 -mindepth 1 -type d -name "repo-cache-dirs-*" | head -n1 || true)
+                      fi
+                      if [ -n "${ROOT_DIR_CAND}" ] && [ -d "${ROOT_DIR_CAND}/immortalwrt" ]; then
+                        echo "Relocating restored cache directories from ${ROOT_DIR_CAND} into workspace..."
+                        mkdir -p immortalwrt
+                        for p in .ccache dl build_dir/host staging_dir/host; do
+                          if [ -d "${ROOT_DIR_CAND}/immortalwrt/${p}" ]; then
+                            mkdir -p "immortalwrt/${p}"
+                            rsync -a "${ROOT_DIR_CAND}/immortalwrt/${p}/" "immortalwrt/${p}/" || true
+                          fi
+                        done
+                        for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/toolchain-*; do
+                          [ -d "${m}" ] || continue
+                          base=$(basename "${m}")
+                          mkdir -p "immortalwrt/build_dir/${base}"
+                          rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
+                        done
+                        for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/toolchain-*; do
+                          [ -d "${m}" ] || continue
+                          base=$(basename "${m}")
+                          mkdir -p "immortalwrt/staging_dir/${base}"
+                          rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
+                        done
+                        rm -rf "${ROOT_DIR_CAND}" || true
+                      fi
+                      echo "Cache restored from previous successful run #${TARGET}."
+                      HIT="true"
+                      break
+                    fi
+                  fi
                 fi
-              done
-              for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/toolchain-*; do
-                [ -d "${m}" ] || continue
-                base=$(basename "${m}")
-                mkdir -p "immortalwrt/build_dir/${base}"
-                rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
-              done
-              for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/toolchain-*; do
-                [ -d "${m}" ] || continue
-                base=$(basename "${m}")
-                mkdir -p "immortalwrt/staging_dir/${base}"
-                rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
-              done
-              rm -rf "${ROOT_DIR_CAND}" || true
+              fi
             fi
-            echo "Cache restored from generic tag ${GENERIC_TAG} (zip)."
-            HIT="true"
-          else
-            echo "No generic cache found for ${GENERIC_TAG}. Proceeding with cold build."
-          fi
+          done
+        fi
+
+        if [ "${HIT}" != "true" ]; then
+          echo "No cache found from previous successful runs. Proceeding with cold build."
         fi
         echo "hit=${HIT}" >> $GITHUB_OUTPUT
 
@@ -366,14 +347,14 @@ jobs:
       with:
         name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
         path: ${{ steps.collect.outputs.files }}
-        retention-days: 30
+        retention-days: 90
         compression-level: 0 # No compression for binaries/pre-compressed firmware files
 
     - name: Upload repo cache artifact
       if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
       uses: actions/upload-artifact@v4
       with:
-        name: repo-cache-dirs-${{ matrix.model }}-${{ (env.IMMORTALWRT_REF && env.IMMORTALWRT_REF) || 'unknown' }}-${{ steps.seed.outputs.seed_hash }}
+        name: repo-cache-dirs-${{ matrix.model }}-${{ (env.IMMORTALWRT_REF && env.IMMORTALWRT_REF) || 'unknown' }}
         path: |
           immortalwrt/.ccache
           immortalwrt/dl
@@ -382,7 +363,7 @@ jobs:
           immortalwrt/build_dir/toolchain-*
           immortalwrt/staging_dir/toolchain-*
         if-no-files-found: ignore
-        retention-days: 7
+        retention-days: 90
         compression-level: 0 # Mostly binaries/pre-compressed; faster uploads
         
   release:
@@ -442,105 +423,6 @@ jobs:
           files: |
             release/tr3000/*
             release/cr6606/*
-
-  repo-cache-prerelease:
-    if: ${{ always() && needs.build.result == 'success' }}
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        model: ${{ fromJSON((github.event.inputs.model == '' || github.event.inputs.model == 'all') && '["cr6606","tr3000"]' || format('["{0}"]', github.event.inputs.model)) }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Compute seed hash (for artifact and tag)
-        id: seed
-        run: |
-          HASH=$(sha256sum "${{ matrix.model }}/seed.config" | cut -d ' ' -f1)
-          echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
-
-      - name: Try download raw artifact zip (no extract)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -e
-          set -o pipefail
-          ARTIFACT_NAME="repo-cache-dirs-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
-          mkdir -p repo_cache
-          echo "Looking for artifact: ${ARTIFACT_NAME}"
-          # jq may not be present on ubuntu-latest minimal image
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update -y >/dev/null 2>&1 || true
-            sudo apt-get install -y jq >/dev/null 2>&1 || true
-          fi
-          API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100"
-          RESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_URL}" || true)
-          if [ -n "${RESP}" ] && echo "${RESP}" | jq -e .artifacts >/dev/null 2>&1; then
-            ART_ID=$(echo "${RESP}" | jq -r --arg n "${ARTIFACT_NAME}" '.artifacts[] | select(.name==$n) | .id' | head -n1)
-            if [ -n "${ART_ID}" ] && [ "${ART_ID}" != "null" ]; then
-              echo "Found artifact id: ${ART_ID}. Downloading zip..."
-              curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -L -o repo_cache/repo-cache.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip"
-              if [ -s repo_cache/repo-cache.zip ]; then
-                echo "ASSET_NAME=repo-cache.zip" >> $GITHUB_ENV
-                echo "ASSET_PATH=repo_cache/repo-cache.zip" >> $GITHUB_ENV
-                echo "CONTENT_TYPE=application/zip" >> $GITHUB_ENV
-                echo "ZIP_READY=true" >> $GITHUB_ENV
-              fi
-            fi
-          fi
-
-      # Skipping directory download/extraction; forward the downloaded artifact zip directly
-
-      - name: Create prerelease and upload repo cache asset
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -e
-          set -o pipefail
-          CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
-          CACHE_NAME="${ASSET_NAME:-repo-cache.zip}"
-          CACHE_PATH="${ASSET_PATH:-repo_cache/repo-cache.zip}"
-          CONTENT_TYPE_HEADER="${CONTENT_TYPE:-application/zip}"
-          API_BASE="https://api.github.com"
-          echo "Ensuring release '${CACHE_TAG}' exists..."
-          if ! curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases/tags/${CACHE_TAG}" -o release.json 2>/dev/null; then
-            PAYLOAD=$(printf '{"tag_name":"%s","name":"%s","prerelease":true,"make_latest":"false"}' "${CACHE_TAG}" "${CACHE_TAG}")
-            curl -fsSL -X POST -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" -d "${PAYLOAD}" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases" -o release.json
-          fi
-          UPLOAD_URL=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' release.json | head -n1)
-          UPLOAD_URL="${UPLOAD_URL%\{*}"
-          echo "Uploading ${CACHE_NAME} to ${UPLOAD_URL}?name=${CACHE_NAME}"
-          curl -fsSL -X POST \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Content-Type: ${CONTENT_TYPE_HEADER}" \
-            --data-binary @"${CACHE_PATH}" \
-            "${UPLOAD_URL}?name=${CACHE_NAME}" \
-            || echo "Repo cache upload failed or asset already exists; continuing."
-
-          # Also attempt to upload/update a generic cache for broader reuse (best-effort)
-          GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
-          echo "Ensuring generic release '${GENERIC_TAG}' exists..."
-          if ! curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases/tags/${GENERIC_TAG}" -o generic_release.json 2>/dev/null; then
-            PAYLOAD=$(printf '{"tag_name":"%s","name":"%s","prerelease":true,"make_latest":"false"}' "${GENERIC_TAG}" "${GENERIC_TAG}")
-            curl -fsSL -X POST -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" -d "${PAYLOAD}" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases" -o generic_release.json || true
-          fi
-          UPLOAD_URL_GEN=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' generic_release.json | head -n1)
-          UPLOAD_URL_GEN="${UPLOAD_URL_GEN%\{*}"
-          echo "Uploading generic cache ${CACHE_NAME} to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort)"
-          curl -fsSL -X POST \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Content-Type: ${CONTENT_TYPE_HEADER}" \
-            --data-binary @"${CACHE_PATH}" \
-            "${UPLOAD_URL_GEN}?name=${CACHE_NAME}" || echo "Generic cache upload skipped/failed; continuing."
 
   notify-completion:
     runs-on: ubuntu-latest
