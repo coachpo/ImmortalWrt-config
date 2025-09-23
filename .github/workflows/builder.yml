@@ -156,6 +156,7 @@ jobs:
       id: restore_repo_cache
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
       run: |
         set -e
         set -o pipefail
@@ -257,6 +258,7 @@ jobs:
       if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
       run: |
         set -e
         set -o pipefail
