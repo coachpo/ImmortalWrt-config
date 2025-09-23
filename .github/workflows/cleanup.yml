@@ -18,6 +18,7 @@ jobs:
         uses: Mattraks/delete-workflow-runs@v2.0.6
         with:
           retain_days: 0
+          keep_minimum_runs: 0
           delete_run_by_conclusion_pattern: 'action_required,cancelled,failure,skipped'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -27,6 +28,7 @@ jobs:
         with:
           retain_days: 0
           keep_minimum_runs: 10
+          delete_run_by_conclusion_pattern: 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
