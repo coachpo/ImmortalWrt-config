@@ -158,34 +158,20 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -e
+        set -o pipefail
         HIT="false"
         CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
         CACHE_NAME="repo-cache.tar.xz"
         echo "Attempting to restore cache: tag=${CACHE_TAG}, asset=${CACHE_NAME}"
         URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${CACHE_TAG}/${CACHE_NAME}"
-        if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o "${CACHE_NAME}" "${URL}"; then
-          echo "Cache found. Extracting..."
-          # Extract only heavy build outputs to avoid clobbering sources/feeds
-          tar -xJf "${CACHE_NAME}" \
-            immortalwrt/build_dir \
-            immortalwrt/staging_dir \
-            immortalwrt/dl \
-            immortalwrt/bin \
-            immortalwrt/.ccache || true
+        if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" "${URL}" | tar -xJf -; then
           echo "Cache restored from ${CACHE_TAG}."
           HIT="true"
         else
           echo "No seed-specific cache found for ${CACHE_TAG}. Trying generic fallback..."
           GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
           GENERIC_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GENERIC_TAG}/${CACHE_NAME}"
-          if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o "${CACHE_NAME}" "${GENERIC_URL}"; then
-            echo "Generic cache found (${GENERIC_TAG}). Extracting..."
-            tar -xJf "${CACHE_NAME}" \
-              immortalwrt/build_dir \
-              immortalwrt/staging_dir \
-              immortalwrt/dl \
-              immortalwrt/bin \
-              immortalwrt/.ccache || true
+          if curl -fL -H "Authorization: Bearer ${GITHUB_TOKEN}" "${GENERIC_URL}" | tar -xJf -; then
             echo "Cache restored from generic tag ${GENERIC_TAG}."
             HIT="true"
           else
@@ -217,7 +203,6 @@ jobs:
       with:
         path: |
           immortalwrt/staging_dir/target-*
-          immortalwrt/build_dir/target-*
         key: ${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}
         restore-keys: |
           ${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-
@@ -256,17 +241,17 @@ jobs:
     - name: Check disk space and cleanup before cache creation
       if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
       run: |
-        echo "Disk usage before cleanup:"
-        df -h
-        echo "Cleaning up unnecessary files..."
-        # Remove temporary files
-        find . -name "*.tmp" -delete 2>/dev/null || true
-        find . -name "*.log" -size +100M -delete 2>/dev/null || true
-        # Remove build artifacts that are not needed for cache
+        set -e
+        echo "Disk usage before cleanup:" && df -h
+        echo "Cleaning up non-reused bulky artifacts..."
+        # Drop large, low-reuse build outputs (keep caches we stream)
+        rm -rf immortalwrt/build_dir/target-* 2>/dev/null || true
+        rm -rf immortalwrt/build_dir/hostpkg 2>/dev/null || true
+        rm -rf immortalwrt/tmp 2>/dev/null || true
         rm -rf immortalwrt/bin/packages 2>/dev/null || true
-        rm -rf immortalwrt/logs 2>/dev/null || true
-        echo "Disk usage after cleanup:"
-        df -h
+        # Trim huge logs
+        find immortalwrt -name "*.log" -size +100M -delete 2>/dev/null || true
+        echo "Disk usage after cleanup:" && df -h
 
     - name: Create and upload repo cache (streaming upload)
       if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
@@ -274,11 +259,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         set -e
+        set -o pipefail
         CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
         CACHE_NAME="repo-cache.tar.xz"
-        
-        echo "Available disk space before cache creation:"
-        df -h .
         
         API_BASE="https://api.github.com"
         echo "Ensuring release '${CACHE_TAG}' exists..."
@@ -289,16 +272,31 @@ jobs:
         UPLOAD_URL=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' release.json | head -n1)
         UPLOAD_URL="${UPLOAD_URL%\{*}"
         
-        echo "Streaming cache creation and upload to ${UPLOAD_URL}?name=${CACHE_NAME}"
-        # Pipe tar directly to curl - no intermediate file created
-        tar -cJ --exclude=.git . | \
+        # Build include list dynamically to avoid failing on missing paths
+        TAR_INCLUDE_DIRS=""
+        add_if_exists() { [ -e "$1" ] && TAR_INCLUDE_DIRS="${TAR_INCLUDE_DIRS} $1"; }
+        for p in \
+          immortalwrt/.ccache \
+          immortalwrt/dl \
+          immortalwrt/build_dir/host \
+          immortalwrt/staging_dir/host; do
+          add_if_exists "$p"
+        done
+        for p in immortalwrt/build_dir/toolchain-* immortalwrt/staging_dir/toolchain-*; do
+          for m in $p; do
+            [ -e "$m" ] && TAR_INCLUDE_DIRS="${TAR_INCLUDE_DIRS} $m"
+          done
+        done
+        echo "Including paths in repo cache:${TAR_INCLUDE_DIRS}"
+        echo "Streaming cache to ${UPLOAD_URL}?name=${CACHE_NAME}"
+        tar --ignore-failed-read -c -I "xz -T0 -6" -f - ${TAR_INCLUDE_DIRS} | \
           curl -fsSL -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Content-Type: application/x-xz" \
             --data-binary @- \
             "${UPLOAD_URL}?name=${CACHE_NAME}"
         echo "Repo cache uploaded as release asset under tag ${CACHE_TAG}."
-
+        
         # Also attempt to upload/update a generic cache for broader reuse (best-effort)
         GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
         echo "Ensuring generic release '${GENERIC_TAG}' exists..."
@@ -308,8 +306,8 @@ jobs:
         fi
         UPLOAD_URL_GEN=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' generic_release.json | head -n1)
         UPLOAD_URL_GEN="${UPLOAD_URL_GEN%\{*}"
-        echo "Streaming generic cache upload to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort)"
-        tar -cJ --exclude=.git . | \
+        echo "Streaming generic cache to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort)"
+        tar --ignore-failed-read -c -I "xz -T0 -6" -f - ${TAR_INCLUDE_DIRS} | \
           curl -fsSL -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Content-Type: application/x-xz" \
