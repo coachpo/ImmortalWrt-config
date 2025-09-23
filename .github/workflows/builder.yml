@@ -165,20 +165,18 @@ jobs:
           
           # Try restoring from latest successful workflow runs' artifacts (search up to 10 successes on this branch)
           if [ -n "${GITHUB_TOKEN}" ]; then
-            # Derive workflow file name for API (use file name per GitHub API)
-            WF_FILE=$(basename "${GITHUB_WORKFLOW_REF%%@*}")
-            CUR_NUM=${GITHUB_RUN_NUMBER}
-            CUR_BRANCH="${GITHUB_REF_NAME:-${GITHUB_HEAD_REF:-}}"
-            echo "Looking for successful runs before #${CUR_NUM} on branch '${CUR_BRANCH}'..."
-            RUNS_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${WF_FILE}/runs?status=success&per_page=20${CUR_BRANCH:+&branch=${CUR_BRANCH}}"
+          # Derive workflow file name for API (use file name per GitHub API)
+          WF_FILE=$(basename "${GITHUB_WORKFLOW_REF%%@*}")
+          echo "Looking for latest successful runs (any branch)..."
+          RUNS_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${WF_FILE}/runs?status=success&per_page=10"
             RESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${RUNS_URL}" || true)
-            # Iterate up to 10 successful runs with lower run_number than current
+          # Iterate up to 10 most recent successful runs
             if [ -n "${RESP}" ]; then
-              echo "Scanning recent successful runs for artifact '${EXPECTED_ART_NAME}'..."
-              RUN_IDS=$(CUR_NUM="${CUR_NUM}" python3 -c 'import json,os,sys; d=json.loads(sys.stdin.read() or "{}"); cur=int(os.environ.get("CUR_NUM","0") or "0"); runs=[r for r in d.get("workflow_runs",[]) if r.get("conclusion")=="success" and isinstance(r.get("run_number"),int) and r.get("run_number")<cur]; runs.sort(key=lambda r:r.get("run_number",0), reverse=True); print(" ".join(str(r.get("id")) for r in runs[:10]))' <<< "${RESP}")
+            echo "Scanning recent successful runs for artifact '${EXPECTED_ART_NAME}'..."
+            RUN_IDS=$(python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); runs=d.get("workflow_runs",[]); print(" ".join(str(r.get("id")) for r in runs[:10]))' <<< "${RESP}")
               for RUN_ID in ${RUN_IDS}; do
                 [ -n "${RUN_ID}" ] || continue
-                echo "Trying to restore from successful run id ${RUN_ID}..."
+              echo "Trying to restore from successful run id ${RUN_ID}..."
                 ART_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"
                 ARESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${ART_URL}" || true)
                 if [ -z "${ARESP}" ]; then continue; fi
