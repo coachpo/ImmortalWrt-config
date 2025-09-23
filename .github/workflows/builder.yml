@@ -238,7 +238,22 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
-    - name: Create and upload repo cache (release tarball)
+    - name: Check disk space and cleanup before cache creation
+      if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
+      run: |
+        set -e
+        echo "Disk usage before cleanup:" && df -h
+        echo "Cleaning up non-reused bulky artifacts..."
+        # Drop large, low-reuse build outputs (keep caches we stream)
+        rm -rf immortalwrt/build_dir/target-* 2>/dev/null || true
+        rm -rf immortalwrt/build_dir/hostpkg 2>/dev/null || true
+        rm -rf immortalwrt/tmp 2>/dev/null || true
+        rm -rf immortalwrt/bin/packages 2>/dev/null || true
+        # Trim huge logs
+        find immortalwrt -name "*.log" -size +100M -delete 2>/dev/null || true
+        echo "Disk usage after cleanup:" && df -h
+
+    - name: Create and upload repo cache (streaming upload)
       if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -263,8 +278,6 @@ jobs:
           done
         done
         echo "Including paths in repo cache:${TAR_INCLUDE_DIRS}"
-        echo "Streaming repo cache (${CACHE_NAME}) without writing to disk..."
-
         API_BASE="https://api.github.com"
         echo "Ensuring release '${CACHE_TAG}' exists..."
         if ! curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases/tags/${CACHE_TAG}" -o release.json; then
@@ -273,7 +286,7 @@ jobs:
         fi
         UPLOAD_URL=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' release.json | head -n1)
         UPLOAD_URL="${UPLOAD_URL%\{*}"
-        echo "Uploading ${CACHE_NAME} to ${UPLOAD_URL}?name=${CACHE_NAME} (streaming tar.xz)"
+        echo "Streaming cache to ${UPLOAD_URL}?name=${CACHE_NAME}"
         tar --ignore-failed-read -c -I "xz -T0 -6" -f - ${TAR_INCLUDE_DIRS} | \
           curl -fsSL -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
@@ -281,7 +294,7 @@ jobs:
             --data-binary @- \
             "${UPLOAD_URL}?name=${CACHE_NAME}"
         echo "Repo cache uploaded as release asset under tag ${CACHE_TAG}."
-
+        
         # Also attempt to upload/update a generic cache for broader reuse (best-effort)
         GENERIC_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
         echo "Ensuring generic release '${GENERIC_TAG}' exists..."
@@ -291,7 +304,7 @@ jobs:
         fi
         UPLOAD_URL_GEN=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' generic_release.json | head -n1)
         UPLOAD_URL_GEN="${UPLOAD_URL_GEN%\{*}"
-        echo "Uploading generic cache ${CACHE_NAME} to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort, streaming)"
+        echo "Streaming generic cache to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort)"
         tar --ignore-failed-read -c -I "xz -T0 -6" -f - ${TAR_INCLUDE_DIRS} | \
           curl -fsSL -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
