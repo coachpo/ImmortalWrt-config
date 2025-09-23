@@ -173,7 +173,7 @@ jobs:
           # Iterate up to 10 most recent successful runs
             if [ -n "${RESP}" ]; then
             echo "Scanning recent successful runs for artifact '${EXPECTED_ART_NAME}'..."
-            RUN_LINES=$(python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); runs=d.get("workflow_runs",[]); print("\\n".join("{}|{}|{}".format(r.get("id"), r.get("run_number"), r.get("html_url","")) for r in runs[:10]))' <<< "${RESP}")
+            RUN_LINES=$(python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); runs=d.get("workflow_runs",[]); print("\n".join("{}|{}|{}".format(r.get("id"), r.get("run_number"), r.get("html_url","")) for r in runs[:10]))' <<< "${RESP}")
             IFS=$'\n'
             for ENTRY in ${RUN_LINES}; do
               [ -n "${ENTRY}" ] || continue
