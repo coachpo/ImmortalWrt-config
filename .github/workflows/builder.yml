@@ -163,78 +163,83 @@ jobs:
           HIT="false"
           EXPECTED_ART_NAME="repo-cache-dirs-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
           
-          # Try restoring from last successful workflow runs' artifacts (up to 3 previous runs)
+          # Try restoring from latest successful workflow runs' artifacts (search up to 10 successes on this branch)
           if [ -n "${GITHUB_TOKEN}" ]; then
-            # Derive workflow file path for API (prefer from GITHUB_WORKFLOW_REF; fallback to file name)
-            WF_PATH=$(echo "${GITHUB_WORKFLOW_REF}" | sed -n 's#^[^/]*/[^/]*/\(.github/workflows/[^@]*\)@.*#\1#p')
-            if [ -z "${WF_PATH}" ]; then WF_PATH="builder.yml"; fi
-            for i in 1 2 3; do
-              TARGET=$((GITHUB_RUN_NUMBER - i))
-              if [ "${TARGET}" -le 0 ]; then continue; fi
-              echo "Trying to restore from previous successful run #${TARGET} (attempt ${i}/3)..."
-              RUNS_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${WF_PATH}/runs?per_page=100"
-              RESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${RUNS_URL}" || true)
-              if [ -n "${RESP}" ]; then
-                RUN_ID=$(TARGET="${TARGET}" python3 -c 'import json,os,sys; d=json.loads(sys.stdin.read() or "{}"); t=int(os.environ.get("TARGET","0") or "0"); print(next((str(r.get("id","")) for r in d.get("workflow_runs", []) if r.get("run_number")==t and r.get("conclusion")=="success"), ""))' <<< "${RESP}")
-                if [ -n "${RUN_ID}" ]; then
-                  ART_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"
-                  ARESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${ART_URL}" || true)
-                  if [ -n "${ARESP}" ]; then
-                    ART_ID=$(EXPECT="${EXPECTED_ART_NAME}" python3 -c 'import json,os,sys; e=os.environ.get("EXPECT",""); d=json.loads(sys.stdin.read() or "{}"); print(next((str(a.get("id","")) for a in d.get("artifacts", []) if a.get("name")==e and not a.get("expired", False)), ""))' <<< "${ARESP}")
-                    if [ -n "${ART_ID}" ]; then
-                      echo "Found matching artifact '${EXPECTED_ART_NAME}' (id=${ART_ID}) in run #${TARGET}; downloading..."
-                      curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -L -o repo-cache.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip"
-                      if [ -s repo-cache.zip ]; then
-                        echo "Extracting previous-run artifact zip..."
-                        if command -v unzip >/dev/null 2>&1; then
-                          unzip -o -q repo-cache.zip || true
-                        elif command -v bsdtar >/dev/null 2>&1; then
-                          bsdtar -xf repo-cache.zip || true
-                        elif command -v python3 >/dev/null 2>&1; then
-                          python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')" repo-cache.zip || true
-                        else
-                          echo "No unzip utility available; skipping zip extraction." >&2
-                        fi
-                        rm -f repo-cache.zip || true
-                        # If extracted zip contains the known top-level artifact folder, move its immortalwrt/* content into place
-                        EXPECTED_ROOT="${EXPECTED_ART_NAME}"
-                        if [ -d "${EXPECTED_ROOT}" ]; then
-                          ROOT_DIR_CAND="${EXPECTED_ROOT}"
-                        else
-                          ROOT_DIR_CAND=$(find . -maxdepth 1 -mindepth 1 -type d -name "repo-cache-dirs-*" | head -n1 || true)
-                        fi
-                        if [ -n "${ROOT_DIR_CAND}" ] && [ -d "${ROOT_DIR_CAND}/immortalwrt" ]; then
-                          echo "Relocating restored cache directories from ${ROOT_DIR_CAND} into workspace..."
-                          mkdir -p immortalwrt
-                          for p in .ccache dl build_dir/host staging_dir/host; do
-                            if [ -d "${ROOT_DIR_CAND}/immortalwrt/${p}" ]; then
-                              mkdir -p "immortalwrt/${p}"
-                              rsync -a "${ROOT_DIR_CAND}/immortalwrt/${p}/" "immortalwrt/${p}/" || true
-                            fi
-                          done
-                          for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/toolchain-*; do
-                            [ -d "${m}" ] || continue
-                            base=$(basename "${m}")
-                            mkdir -p "immortalwrt/build_dir/${base}"
-                            rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
-                          done
-                          for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/toolchain-*; do
-                            [ -d "${m}" ] || continue
-                            base=$(basename "${m}")
-                            mkdir -p "immortalwrt/staging_dir/${base}"
-                            rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
-                          done
-                          rm -rf "${ROOT_DIR_CAND}" || true
-                        fi
-                        echo "Cache restored from previous successful run #${TARGET}."
-                        HIT="true"
-                        break
-                      fi
+            # Derive workflow file name for API (use file name per GitHub API)
+            WF_FILE=$(basename "${GITHUB_WORKFLOW_REF%%@*}")
+            CUR_NUM=${GITHUB_RUN_NUMBER}
+            CUR_BRANCH="${GITHUB_REF_NAME:-${GITHUB_HEAD_REF:-}}"
+            echo "Looking for successful runs before #${CUR_NUM} on branch '${CUR_BRANCH}'..."
+            RUNS_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${WF_FILE}/runs?status=success&per_page=20${CUR_BRANCH:+&branch=${CUR_BRANCH}}"
+            RESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${RUNS_URL}" || true)
+            # Iterate up to 10 successful runs with lower run_number than current
+            if [ -n "${RESP}" ]; then
+              echo "Scanning recent successful runs for artifact '${EXPECTED_ART_NAME}'..."
+              RUN_IDS=$(CUR_NUM="${CUR_NUM}" python3 -c 'import json,os,sys; d=json.loads(sys.stdin.read() or "{}"); cur=int(os.environ.get("CUR_NUM","0") or "0"); runs=[r for r in d.get("workflow_runs",[]) if r.get("conclusion")=="success" and isinstance(r.get("run_number"),int) and r.get("run_number")<cur]; runs.sort(key=lambda r:r.get("run_number",0), reverse=True); print(" ".join(str(r.get("id")) for r in runs[:10]))' <<< "${RESP}")
+              for RUN_ID in ${RUN_IDS}; do
+                [ -n "${RUN_ID}" ] || continue
+                echo "Trying to restore from successful run id ${RUN_ID}..."
+                ART_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"
+                ARESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${ART_URL}" || true)
+                if [ -z "${ARESP}" ]; then continue; fi
+                # Find exact artifact name match only
+                ART_INFO=$(EXPECT="${EXPECTED_ART_NAME}" python3 -c 'import json,os,sys; e=os.environ.get("EXPECT",""); d=json.loads(sys.stdin.read() or "{}"); arts=[a for a in d.get("artifacts",[]) if not a.get("expired",False) and a.get("name")==e]; print("%s %s"%(arts[0].get("id",""), arts[0].get("name","")) if arts else " ")' <<< "${ARESP}")
+                ART_ID=$(echo "${ART_INFO}" | awk '{print $1}')
+                ART_NAME=$(echo "${ART_INFO}" | cut -d' ' -f2-)
+                if [ -n "${ART_ID}" ] && [ "${ART_ID}" != "null" ]; then
+                  echo "Found artifact '${ART_NAME}' (id=${ART_ID}); downloading..."
+                  # Use -f but do not fail the whole step on 404; just continue to next run
+                  if curl -fSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o repo-cache.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip"; then
+                    echo "Extracting artifact zip..."
+                    if command -v unzip >/dev/null 2>&1; then
+                      unzip -o -q repo-cache.zip || true
+                    elif command -v bsdtar >/dev/null 2>&1; then
+                      bsdtar -xf repo-cache.zip || true
+                    elif command -v python3 >/dev/null 2>&1; then
+                      python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')" repo-cache.zip || true
+                    else
+                      echo "No unzip utility available; skipping zip extraction." >&2
                     fi
+                    rm -f repo-cache.zip || true
+                    # If extracted zip contains the known top-level artifact folder, move its immortalwrt/* content into place
+                    EXPECTED_ROOT="${ART_NAME}"
+                    if [ -d "${EXPECTED_ROOT}" ]; then
+                      ROOT_DIR_CAND="${EXPECTED_ROOT}"
+                    else
+                      ROOT_DIR_CAND=$(find . -maxdepth 1 -mindepth 1 -type d -name "repo-cache-dirs-*" | head -n1 || true)
+                    fi
+                    if [ -n "${ROOT_DIR_CAND}" ] && [ -d "${ROOT_DIR_CAND}/immortalwrt" ]; then
+                      echo "Relocating restored cache directories from ${ROOT_DIR_CAND} into workspace..."
+                      mkdir -p immortalwrt
+                      for p in .ccache dl build_dir/host staging_dir/host; do
+                        if [ -d "${ROOT_DIR_CAND}/immortalwrt/${p}" ]; then
+                          mkdir -p "immortalwrt/${p}"
+                          rsync -a "${ROOT_DIR_CAND}/immortalwrt/${p}/" "immortalwrt/${p}/" || true
+                        fi
+                      done
+                      for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/toolchain-*; do
+                        [ -d "${m}" ] || continue
+                        base=$(basename "${m}")
+                        mkdir -p "immortalwrt/build_dir/${base}"
+                        rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
+                      done
+                      for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/toolchain-*; do
+                        [ -d "${m}" ] || continue
+                        base=$(basename "${m}")
+                        mkdir -p "immortalwrt/staging_dir/${base}"
+                        rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
+                      done
+                      rm -rf "${ROOT_DIR_CAND}" || true
+                    fi
+                    echo "Cache restored from successful run id ${RUN_ID}."
+                    HIT="true"
+                    break
+                  else
+                    echo "Download failed (possibly 404). Trying next successful run..."
                   fi
                 fi
-              fi
-            done
+              done
+            fi
           fi
           
           if [ "${HIT}" != "true" ]; then
