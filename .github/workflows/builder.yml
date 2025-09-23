@@ -262,7 +262,26 @@ jobs:
         set -o pipefail
         CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
         CACHE_NAME="repo-cache.tar.xz"
+<<<<<<< HEAD
+        # Only include reusable caches to minimize size
+        TAR_INCLUDE_DIRS=""
+        add_if_exists() { [ -e "$1" ] && TAR_INCLUDE_DIRS="${TAR_INCLUDE_DIRS} $1"; }
+        for p in \
+          immortalwrt/.ccache \
+          immortalwrt/dl \
+          immortalwrt/build_dir/host \
+          immortalwrt/staging_dir/host; do
+          add_if_exists "$p"
+        done
+        for p in immortalwrt/build_dir/toolchain-* immortalwrt/staging_dir/toolchain-*; do
+          for m in $p; do
+            [ -e "$m" ] && TAR_INCLUDE_DIRS="${TAR_INCLUDE_DIRS} $m"
+          done
+        done
+        echo "Including paths in repo cache:${TAR_INCLUDE_DIRS}"
+=======
         
+>>>>>>> origin/main
         API_BASE="https://api.github.com"
         echo "Ensuring release '${CACHE_TAG}' exists..."
         if ! curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases/tags/${CACHE_TAG}" -o release.json; then
@@ -271,6 +290,8 @@ jobs:
         fi
         UPLOAD_URL=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' release.json | head -n1)
         UPLOAD_URL="${UPLOAD_URL%\{*}"
+<<<<<<< HEAD
+=======
         
         # Build include list dynamically to avoid failing on missing paths
         TAR_INCLUDE_DIRS=""
@@ -288,6 +309,7 @@ jobs:
           done
         done
         echo "Including paths in repo cache:${TAR_INCLUDE_DIRS}"
+>>>>>>> origin/main
         echo "Streaming cache to ${UPLOAD_URL}?name=${CACHE_NAME}"
         tar --ignore-failed-read -c -I "xz -T0 -6" -f - ${TAR_INCLUDE_DIRS} | \
           curl -fsSL -X POST \
