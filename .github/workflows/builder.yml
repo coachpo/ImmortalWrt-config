@@ -173,11 +173,18 @@ jobs:
           # Iterate up to 10 most recent successful runs
             if [ -n "${RESP}" ]; then
             echo "Scanning recent successful runs for artifact '${EXPECTED_ART_NAME}'..."
-            RUN_IDS=$(python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); runs=d.get("workflow_runs",[]); print(" ".join(str(r.get("id")) for r in runs[:10]))' <<< "${RESP}")
-              for RUN_ID in ${RUN_IDS}; do
-                [ -n "${RUN_ID}" ] || continue
-              echo "Trying to restore from successful run id ${RUN_ID}..."
-                ART_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"
+            RUN_LINES=$(python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); runs=d.get("workflow_runs",[]); out=[]
+for r in runs[:10]: out.append("{}|{}|{}".format(r.get("id"), r.get("run_number"), r.get("html_url",""))); print("\n".join(out))' <<< "${RESP}")
+            IFS=$'\n'
+            for ENTRY in ${RUN_LINES}; do
+              [ -n "${ENTRY}" ] || continue
+              RUN_ID="${ENTRY%%|*}"
+              REST="${ENTRY#*|}"
+              RUN_NUM="${REST%%|*}"
+              RUN_URL="${REST#*|}"
+              echo "Trying to restore from successful run #${RUN_NUM} (${RUN_URL}) (id ${RUN_ID})..."
+              ART_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"
+              echo "Artifacts API: ${ART_URL}"
                 ARESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${ART_URL}" || true)
                 if [ -z "${ARESP}" ]; then continue; fi
                 # Find exact artifact name match only
@@ -185,9 +192,10 @@ jobs:
                 ART_ID=$(echo "${ART_INFO}" | awk '{print $1}')
                 ART_NAME=$(echo "${ART_INFO}" | cut -d' ' -f2-)
                 if [ -n "${ART_ID}" ] && [ "${ART_ID}" != "null" ]; then
-                  echo "Found artifact '${ART_NAME}' (id=${ART_ID}); downloading..."
+                DL_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip"
+                echo "Found artifact '${ART_NAME}' (id=${ART_ID}) in run #${RUN_NUM}; downloading from ${DL_URL}..."
                   # Use -f but do not fail the whole step on 404; just continue to next run
-                  if curl -fSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o repo-cache.zip "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip"; then
+                if curl -fSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o repo-cache.zip "${DL_URL}"; then
                     echo "Extracting artifact zip..."
                     if command -v unzip >/dev/null 2>&1; then
                       unzip -o -q repo-cache.zip || true
@@ -229,7 +237,7 @@ jobs:
                       done
                       rm -rf "${ROOT_DIR_CAND}" || true
                     fi
-                    echo "Cache restored from successful run id ${RUN_ID}."
+                echo "Cache restored from successful run #${RUN_NUM} (${RUN_URL})."
                     HIT="true"
                     break
                   else
