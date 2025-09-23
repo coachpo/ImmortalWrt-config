@@ -253,7 +253,22 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
         echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
-    - name: Create and upload repo cache (release tarball)
+    - name: Check disk space and cleanup before cache creation
+      if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
+      run: |
+        echo "Disk usage before cleanup:"
+        df -h
+        echo "Cleaning up unnecessary files..."
+        # Remove temporary files
+        find . -name "*.tmp" -delete 2>/dev/null || true
+        find . -name "*.log" -size +100M -delete 2>/dev/null || true
+        # Remove build artifacts that are not needed for cache
+        rm -rf immortalwrt/bin/packages 2>/dev/null || true
+        rm -rf immortalwrt/logs 2>/dev/null || true
+        echo "Disk usage after cleanup:"
+        df -h
+
+    - name: Create and upload repo cache (streaming upload)
       if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -261,10 +276,10 @@ jobs:
         set -e
         CACHE_TAG="cache-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}-${{ steps.seed.outputs.seed_hash }}"
         CACHE_NAME="repo-cache.tar.xz"
-        echo "Creating repo cache tarball: ${CACHE_NAME}"
-        # Create at repo root; exclude VCS metadata
-        tar -cJf "${CACHE_NAME}" --exclude=.git .
-
+        
+        echo "Available disk space before cache creation:"
+        df -h .
+        
         API_BASE="https://api.github.com"
         echo "Ensuring release '${CACHE_TAG}' exists..."
         if ! curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${API_BASE}/repos/${GITHUB_REPOSITORY}/releases/tags/${CACHE_TAG}" -o release.json; then
@@ -273,12 +288,15 @@ jobs:
         fi
         UPLOAD_URL=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' release.json | head -n1)
         UPLOAD_URL="${UPLOAD_URL%\{*}"
-        echo "Uploading ${CACHE_NAME} to ${UPLOAD_URL}?name=${CACHE_NAME}"
-        curl -fsSL -X POST \
-          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-          -H "Content-Type: application/x-xz" \
-          --data-binary @"${CACHE_NAME}" \
-          "${UPLOAD_URL}?name=${CACHE_NAME}"
+        
+        echo "Streaming cache creation and upload to ${UPLOAD_URL}?name=${CACHE_NAME}"
+        # Pipe tar directly to curl - no intermediate file created
+        tar -cJ --exclude=.git . | \
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/x-xz" \
+            --data-binary @- \
+            "${UPLOAD_URL}?name=${CACHE_NAME}"
         echo "Repo cache uploaded as release asset under tag ${CACHE_TAG}."
 
         # Also attempt to upload/update a generic cache for broader reuse (best-effort)
@@ -290,12 +308,13 @@ jobs:
         fi
         UPLOAD_URL_GEN=$(sed -n 's/.*"upload_url"[ ]*:[ ]*"\([^"]*\)".*/\1/p' generic_release.json | head -n1)
         UPLOAD_URL_GEN="${UPLOAD_URL_GEN%\{*}"
-        echo "Uploading generic cache ${CACHE_NAME} to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort)"
-        curl -fsSL -X POST \
-          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-          -H "Content-Type: application/x-xz" \
-          --data-binary @"${CACHE_NAME}" \
-          "${UPLOAD_URL_GEN}?name=${CACHE_NAME}" || echo "Generic cache upload skipped/failed; continuing."
+        echo "Streaming generic cache upload to ${UPLOAD_URL_GEN}?name=${CACHE_NAME} (best-effort)"
+        tar -cJ --exclude=.git . | \
+          curl -fsSL -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/x-xz" \
+            --data-binary @- \
+            "${UPLOAD_URL_GEN}?name=${CACHE_NAME}" || echo "Generic cache upload skipped/failed; continuing."
 
     - name: Check space usage
       if: ${{ !cancelled() }}
