@@ -52,7 +52,7 @@ env:
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
-  CCACHE_MAX_SIZE: 4G
+  CCACHE_MAX_SIZE: 8G
   # Notification settings
   BARK_SUCCESS_SOUND: "birdsong"
   BARK_FAILURE_SOUND: "calypso"
@@ -239,6 +239,11 @@ jobs:
           echo "status=success" >> $GITHUB_OUTPUT
           echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
+      - name: ccache stats
+        if: ${{ !cancelled() }}
+        run: |
+          CCACHE_DIR=immortalwrt/.ccache ccache -s || true
+
       - name: Check disk space and cleanup before cache creation
         if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
         run: |
@@ -250,6 +255,11 @@ jobs:
           # Drop large, low-reuse build outputs (keep caches we stream)
           rm -rf immortalwrt/tmp 2>/dev/null || true
           rm -rf immortalwrt/bin/packages 2>/dev/null || true
+          # Prune heavy low-reuse targets content to keep cache lean
+          find immortalwrt/build_dir -maxdepth 1 -type d -name 'target-*' -print0 | while IFS= read -r -d '' tgt; do
+            rm -rf "$tgt"/linux-* 2>/dev/null || true
+            rm -rf "$tgt"/samba-* 2>/dev/null || true
+          done
           # Trim huge logs
           find immortalwrt -name "*.log" -size +100M -delete 2>/dev/null || true
           echo "Disk usage after cleanup:" && df -h
