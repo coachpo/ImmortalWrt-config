@@ -86,10 +86,6 @@ jobs:
           echo "SEED_HASH=$HASH" >> $GITHUB_ENV
           echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
 
-      - name: Prepare model config
-        run: |
-          cp "${{ matrix.model }}/seed.config" immortalwrt/.config
-
       - name: Set ImmortalWrt submodule to requested ref
         if: ${{ env.IMMORTALWRT_REF != '' }}
         run: |
@@ -108,118 +104,6 @@ jobs:
           fi
           git -C immortalwrt checkout --recurse-submodules --detach "${TARGET_REF}"
           git -C immortalwrt submodule update --init --recursive --depth=1
-
-      - name: "Restore repo cache from previous successful runs' artifacts"
-        id: restore_repo_cache
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -e
-          set -o pipefail
-          HIT="false"
-          EXPECTED_ART_NAME="repo-cache-dirs-${{ matrix.model }}-${IMMORTALWRT_REF:-unknown}"
-          
-          # Try restoring from latest successful workflow runs' artifacts (search up to 10 successes on this branch)
-          if [ -n "${GITHUB_TOKEN}" ]; then
-          # Derive workflow file name for API (use file name per GitHub API)
-          WF_FILE=$(basename "${GITHUB_WORKFLOW_REF%%@*}")
-          echo "Looking for latest successful runs (any branch)..."
-          RUNS_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/${WF_FILE}/runs?status=success&per_page=10"
-            RESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${RUNS_URL}" || true)
-          # Iterate up to 10 most recent successful runs
-            if [ -n "${RESP}" ]; then
-            echo "Scanning recent successful runs for artifact '${EXPECTED_ART_NAME}'..."
-            RUN_LINES=$(python3 -c 'import json,sys; d=json.loads(sys.stdin.read() or "{}"); runs=d.get("workflow_runs",[]); print("\n".join("{}|{}|{}".format(r.get("id"), r.get("run_number"), r.get("html_url","")) for r in runs[:10]))' <<< "${RESP}")
-            IFS=$'\n'
-            for ENTRY in ${RUN_LINES}; do
-              [ -n "${ENTRY}" ] || continue
-              RUN_ID="${ENTRY%%|*}"
-              REST="${ENTRY#*|}"
-              RUN_NUM="${REST%%|*}"
-              RUN_URL="${REST#*|}"
-              echo "Trying to restore from successful run #${RUN_NUM} (${RUN_URL}) (id ${RUN_ID})..."
-              ART_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100"
-              echo "Artifacts API: ${ART_URL}"
-                ARESP=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${ART_URL}" || true)
-                if [ -z "${ARESP}" ]; then continue; fi
-                # Find exact artifact name match only
-                ART_INFO=$(EXPECT="${EXPECTED_ART_NAME}" python3 -c 'import json,os,sys; e=os.environ.get("EXPECT",""); d=json.loads(sys.stdin.read() or "{}"); arts=[a for a in d.get("artifacts",[]) if not a.get("expired",False) and a.get("name")==e]; print("%s %s"%(arts[0].get("id",""), arts[0].get("name","")) if arts else " ")' <<< "${ARESP}")
-                ART_ID=$(echo "${ART_INFO}" | awk '{print $1}')
-                ART_NAME=$(echo "${ART_INFO}" | cut -d' ' -f2-)
-                if [ -n "${ART_ID}" ] && [ "${ART_ID}" != "null" ]; then
-                DL_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ART_ID}/zip"
-                echo "Found artifact '${ART_NAME}' (id=${ART_ID}) in run #${RUN_NUM}; downloading from ${DL_URL}..."
-                  # Use -f but do not fail the whole step on 404; just continue to next run
-                if curl -fSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -o repo-cache.zip "${DL_URL}"; then
-                    echo "Extracting artifact zip..."
-                    if command -v unzip >/dev/null 2>&1; then
-                      unzip -o -q repo-cache.zip || true
-                    elif command -v bsdtar >/dev/null 2>&1; then
-                      bsdtar -xf repo-cache.zip || true
-                    elif command -v python3 >/dev/null 2>&1; then
-                      python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('.')" repo-cache.zip || true
-                    else
-                      echo "No unzip utility available; skipping zip extraction." >&2
-                    fi
-                    rm -f repo-cache.zip || true
-                    # If extracted zip contains the known top-level artifact folder, move its immortalwrt/* content into place
-                    EXPECTED_ROOT="${ART_NAME}"
-                    if [ -d "${EXPECTED_ROOT}" ]; then
-                      ROOT_DIR_CAND="${EXPECTED_ROOT}"
-                    else
-                      ROOT_DIR_CAND=$(find . -maxdepth 1 -mindepth 1 -type d -name "repo-cache-dirs-*" | head -n1 || true)
-                    fi
-                    if [ -n "${ROOT_DIR_CAND}" ] && [ -d "${ROOT_DIR_CAND}/immortalwrt" ]; then
-                      echo "Relocating restored cache directories from ${ROOT_DIR_CAND} into workspace..."
-                      mkdir -p immortalwrt
-                      for p in .ccache dl feeds build_dir/host staging_dir/host build_dir/hostpkg staging_dir/hostpkg; do
-                        if [ -d "${ROOT_DIR_CAND}/immortalwrt/${p}" ]; then
-                          mkdir -p "immortalwrt/${p}"
-                          rsync -a "${ROOT_DIR_CAND}/immortalwrt/${p}/" "immortalwrt/${p}/" || true
-                        fi
-                      done
-                      for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/toolchain-*; do
-                        [ -d "${m}" ] || continue
-                        base=$(basename "${m}")
-                        mkdir -p "immortalwrt/build_dir/${base}"
-                        rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
-                      done
-                      for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/toolchain-*; do
-                        [ -d "${m}" ] || continue
-                        base=$(basename "${m}")
-                        mkdir -p "immortalwrt/staging_dir/${base}"
-                        rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
-                      done
-                      for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/target-*; do
-                        [ -d "${m}" ] || continue
-                        base=$(basename "${m}")
-                        mkdir -p "immortalwrt/build_dir/${base}"
-                        rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
-                      done
-                      for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/target-*; do
-                        [ -d "${m}" ] || continue
-                        base=$(basename "${m}")
-                        mkdir -p "immortalwrt/staging_dir/${base}"
-                        rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
-                      done
-                      rm -rf "${ROOT_DIR_CAND}" || true
-                    fi
-                echo "Cache restored from successful run #${RUN_NUM} (${RUN_URL})."
-                    HIT="true"
-                    break
-                  else
-                    echo "Download failed (possibly 404). Trying next successful run..."
-                  fi
-                fi
-              done
-            fi
-          fi
-          
-          if [ "${HIT}" != "true" ]; then
-            echo "No cache found from previous successful runs. Proceeding with cold build."
-          fi
-          echo "hit=${HIT}" >> $GITHUB_OUTPUT
 
       - name: Prepare ccache dir
         run: mkdir -p immortalwrt/.ccache || true
@@ -264,6 +148,10 @@ jobs:
           cd immortalwrt
           ./scripts/feeds install -a
 
+      - name: Prepare model config
+        run: |
+          cp "${{ matrix.model }}/seed.config" immortalwrt/.config
+
       - name: Generate config (enable ccache)
         run: |
           cd immortalwrt
@@ -271,7 +159,6 @@ jobs:
           make defconfig
 
       - name: Restore toolchain caches (per model/ref)
-        if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -282,7 +169,6 @@ jobs:
             ${{ runner.os }}-toolchain-${{ matrix.model }}-
 
       - name: Restore target caches (per model/ref/seed)
-        if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -293,7 +179,6 @@ jobs:
             ${{ runner.os }}-target-${{ matrix.model }}-
 
       - name: Restore build target caches (per model/ref/seed)
-        if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -304,7 +189,6 @@ jobs:
             ${{ runner.os }}-build-target-${{ matrix.model }}-
 
       - name: Restore host tools cache (per ref)
-        if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -315,7 +199,6 @@ jobs:
             ${{ runner.os }}-host-
 
       - name: Restore hostpkg caches (per ref)
-        if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
         uses: actions/cache@v4
         with:
           path: |
@@ -393,27 +276,6 @@ jobs:
           path: ${{ steps.collect.outputs.files }}
           retention-days: 7
           compression-level: 0 # No compression for binaries/pre-compressed firmware files
-
-      - name: Upload repo cache artifact
-        if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: repo-cache-dirs-${{ matrix.model }}-${{ (env.IMMORTALWRT_REF && env.IMMORTALWRT_REF) || 'unknown' }}
-          path: |
-            immortalwrt/.ccache
-            immortalwrt/dl
-            immortalwrt/feeds
-            immortalwrt/build_dir/host
-            immortalwrt/staging_dir/host
-            immortalwrt/build_dir/target-*
-            immortalwrt/staging_dir/target-*
-            immortalwrt/build_dir/toolchain-*
-            immortalwrt/staging_dir/toolchain-*
-            immortalwrt/build_dir/hostpkg
-            immortalwrt/staging_dir/hostpkg
-          if-no-files-found: ignore
-          retention-days: 90
-          compression-level: 0 # Mostly binaries/pre-compressed; faster uploads
 
   release:
     if: ${{ always() && needs.build.result == 'success' && github.event.inputs.upload_release == 'true' }}
