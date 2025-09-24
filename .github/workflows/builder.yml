@@ -109,6 +109,7 @@ jobs:
         run: mkdir -p immortalwrt/.ccache || true
 
       - name: Restore ccache cache (per model/ref)
+        id: cache-ccache
         uses: actions/cache@v4
         with:
           path: immortalwrt/.ccache
@@ -118,6 +119,7 @@ jobs:
             ${{ runner.os }}-ccache-
 
       - name: Restore ImmortalWrt downloads cache (per model/ref)
+        id: cache-dl
         uses: actions/cache@v4
         with:
           path: immortalwrt/dl
@@ -131,6 +133,7 @@ jobs:
           CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
 
       - name: Restore feeds cache (per ref + feeds.conf)
+        id: cache-feeds
         uses: actions/cache@v4
         with:
           path: immortalwrt/feeds
@@ -159,6 +162,7 @@ jobs:
           make defconfig
 
       - name: Restore toolchain caches (per model/ref)
+        id: cache-toolchain
         uses: actions/cache@v4
         with:
           path: |
@@ -169,6 +173,7 @@ jobs:
             ${{ runner.os }}-toolchain-${{ matrix.model }}-
 
       - name: Restore target caches (per model/ref/seed)
+        id: cache-target-staging
         uses: actions/cache@v4
         with:
           path: |
@@ -179,6 +184,7 @@ jobs:
             ${{ runner.os }}-target-${{ matrix.model }}-
 
       - name: Restore build target caches (per model/ref/seed)
+        id: cache-target-build
         uses: actions/cache@v4
         with:
           path: |
@@ -189,6 +195,7 @@ jobs:
             ${{ runner.os }}-build-target-${{ matrix.model }}-
 
       - name: Restore host tools cache (per ref)
+        id: cache-host
         uses: actions/cache@v4
         with:
           path: |
@@ -199,6 +206,7 @@ jobs:
             ${{ runner.os }}-host-
 
       - name: Restore hostpkg caches (per ref)
+        id: cache-hostpkg
         uses: actions/cache@v4
         with:
           path: |
@@ -207,6 +215,21 @@ jobs:
           key: ${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}
           restore-keys: |
             ${{ runner.os }}-hostpkg-
+
+      - name: Summarize cache hits
+        if: always()
+        run: |
+          {
+            echo "### Cache hits";
+            echo "- ccache: ${{ steps.cache-ccache.outputs.cache-hit || 'false' }} key=${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- dl: ${{ steps.cache-dl.outputs.cache-hit || 'false' }} key=${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- feeds: ${{ steps.cache-feeds.outputs.cache-hit || 'false' }} key=${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- toolchain: ${{ steps.cache-toolchain.outputs.cache-hit || 'false' }} key=${{ runner.os }}-toolchain-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- target-staging: ${{ steps.cache-target-staging.outputs.cache-hit || 'false' }} key=${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
+            echo "- target-build: ${{ steps.cache-target-build.outputs.cache-hit || 'false' }} key=${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
+            echo "- host: ${{ steps.cache-host.outputs.cache-hit || 'false' }} key=${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}";
+            echo "- hostpkg: ${{ steps.cache-hostpkg.outputs.cache-hit || 'false' }} key=${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}";
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Compile the firmware
         id: compile
