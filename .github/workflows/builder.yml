@@ -239,10 +239,6 @@ jobs:
           echo "status=success" >> $GITHUB_OUTPUT
           echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
 
-      - name: ccache stats
-        if: ${{ !cancelled() }}
-        run: |
-          CCACHE_DIR=immortalwrt/.ccache ccache -s || true
 
       - name: Check disk space and cleanup before cache creation
         if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
@@ -269,11 +265,13 @@ jobs:
           FREED_DF=$((BEFORE_DF-AFTER_DF))
           echo "Workspace freed: $((FREED_WS/1024/1024)) MiB"
           echo "Disk freed: $((FREED_DF/1024/1024)) MiB"
-
-      - name: Check space usage
+      
+      - name: Check space usage and ccache stats
         if: ${{ !cancelled() }}
-        run: df -hT
-
+        run: |
+          df -hT
+          CCACHE_DIR=immortalwrt/.ccache ccache -s || true
+  
       - name: Summarize cache hits
         if: always()
         run: |
