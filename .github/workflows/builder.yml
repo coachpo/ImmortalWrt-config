@@ -216,8 +216,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-hostpkg-
 
-      
-
       - name: Compile the firmware
         id: compile
         run: |
@@ -238,7 +236,6 @@ jobs:
             || make -j1 V=s
           echo "status=success" >> $GITHUB_OUTPUT
           echo "file_date=_$(date +%Y%m%d%H%M)" >> $GITHUB_OUTPUT
-
 
       - name: Check disk space and cleanup before cache creation
         if: ${{ !cancelled() && steps.compile.outputs.status == 'success' }}
@@ -266,10 +263,9 @@ jobs:
           echo "Workspace freed: $((FREED_WS/1024/1024)) MiB"
           echo "Disk freed: $((FREED_DF/1024/1024)) MiB"
       
-      - name: Check space usage and ccache stats
+      - name: ccache stats
         if: ${{ !cancelled() }}
         run: |
-          df -hT
           CCACHE_DIR=immortalwrt/.ccache ccache -s || true
   
       - name: Summarize cache hits
