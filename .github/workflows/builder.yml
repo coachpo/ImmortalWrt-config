@@ -292,6 +292,17 @@ jobs:
             ${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-
             ${{ runner.os }}-target-${{ matrix.model }}-
 
+      - name: Restore build target caches (per model/ref/seed)
+        if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            immortalwrt/build_dir/target-*
+          key: ${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}
+          restore-keys: |
+            ${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-
+            ${{ runner.os }}-build-target-${{ matrix.model }}-
+
       - name: Restore host tools cache (per ref)
         if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
         uses: actions/cache@v4
@@ -302,6 +313,17 @@ jobs:
           key: ${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}
           restore-keys: |
             ${{ runner.os }}-host-
+
+      - name: Restore hostpkg caches (per ref)
+        if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            immortalwrt/build_dir/hostpkg
+            immortalwrt/staging_dir/hostpkg
+          key: ${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}
+          restore-keys: |
+            ${{ runner.os }}-hostpkg-
 
       - name: Compile the firmware
         id: compile
@@ -331,8 +353,6 @@ jobs:
           echo "Disk usage before cleanup:" && df -h
           echo "Cleaning up non-reused bulky artifacts..."
           # Drop large, low-reuse build outputs (keep caches we stream)
-          rm -rf immortalwrt/build_dir/target-* 2>/dev/null || true
-          rm -rf immortalwrt/build_dir/hostpkg 2>/dev/null || true
           rm -rf immortalwrt/tmp 2>/dev/null || true
           rm -rf immortalwrt/bin/packages 2>/dev/null || true
           # Trim huge logs
