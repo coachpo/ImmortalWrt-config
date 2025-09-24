@@ -1,4 +1,4 @@
-name: Cleanup
+name: 99_cleanup
 
 on:
   schedule:
