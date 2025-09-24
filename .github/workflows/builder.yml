@@ -118,6 +118,10 @@ jobs:
             ${{ runner.os }}-ccache-${{ matrix.model }}-
             ${{ runner.os }}-ccache-
 
+      - name: Setup ccache
+        run: |
+          CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
+
       - name: Restore ImmortalWrt downloads cache (per model/ref)
         id: cache-dl
         uses: actions/cache@v4
@@ -127,11 +131,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dl-${{ matrix.model }}-
             ${{ runner.os }}-dl-
-
-      - name: Setup ccache
-        run: |
-          CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
-
+  
       - name: Restore feeds cache (per ref + feeds.conf)
         id: cache-feeds
         uses: actions/cache@v4
@@ -151,14 +151,18 @@ jobs:
           cd immortalwrt
           ./scripts/feeds install -a
 
-      - name: Prepare model config
+      - name: Prepare model build config
         run: |
           cp "${{ matrix.model }}/seed.config" immortalwrt/.config
 
-      - name: Generate config (enable ccache)
+      - name: Enable ccache build option in config
         run: |
           cd immortalwrt
           grep -q '^CONFIG_CCACHE=y' .config || echo 'CONFIG_CCACHE=y' >> .config
+          
+      - name: Generate build config
+        run: |
+          cd immortalwrt
           make defconfig
 
       - name: Restore toolchain caches (per model/ref)
