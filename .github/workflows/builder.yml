@@ -155,11 +155,11 @@ jobs:
         run: |
           cp "${{ matrix.model }}/seed.config" immortalwrt/.config
 
-      - name: Enable ccache build option in config
+      - name: Enable ccache build option in build config
         run: |
           cd immortalwrt
           grep -q '^CONFIG_CCACHE=y' .config || echo 'CONFIG_CCACHE=y' >> .config
-          
+
       - name: Generate build config
         run: |
           cd immortalwrt
