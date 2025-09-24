@@ -79,6 +79,17 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Compute seed hash (for build caches)
+        id: seed
+        run: |
+          HASH=$(sha256sum "${{ matrix.model }}/seed.config" | cut -d ' ' -f1)
+          echo "SEED_HASH=$HASH" >> $GITHUB_ENV
+          echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Prepare model config
+        run: |
+          cp "${{ matrix.model }}/seed.config" immortalwrt/.config
+
       - name: Set ImmortalWrt submodule to requested ref
         if: ${{ env.IMMORTALWRT_REF != '' }}
         run: |
@@ -97,60 +108,6 @@ jobs:
           fi
           git -C immortalwrt checkout --recurse-submodules --detach "${TARGET_REF}"
           git -C immortalwrt submodule update --init --recursive --depth=1
-
-      - name: Prepare ccache dir
-        run: mkdir -p immortalwrt/.ccache
-
-      - name: Restore ccache cache (per model/ref)
-        uses: actions/cache@v4
-        with:
-          path: immortalwrt/.ccache
-          key: ${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-${{ matrix.model }}-
-            ${{ runner.os }}-ccache-
-
-      - name: Restore ImmortalWrt downloads cache (per model/ref)
-        uses: actions/cache@v4
-        with:
-          path: immortalwrt/dl
-          key: ${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}
-          restore-keys: |
-            ${{ runner.os }}-dl-${{ matrix.model }}-
-            ${{ runner.os }}-dl-
-
-      - name: Setup ccache
-        run: |
-          CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
-
-      - name: Restore feeds cache (per ref + feeds.conf)
-        uses: actions/cache@v4
-        with:
-          path: immortalwrt/feeds
-          key: ${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}
-          restore-keys: |
-            ${{ runner.os }}-feeds-
-
-      - name: Update feeds
-        run: |
-          cd immortalwrt
-          ./scripts/feeds update -a
-
-      - name: Install feeds
-        run: |
-          cd immortalwrt
-          ./scripts/feeds install -a
-
-      - name: Prepare model config
-        run: |
-          cp "${{ matrix.model }}/seed.config" immortalwrt/.config
-
-      - name: Compute seed hash (for build caches)
-        id: seed
-        run: |
-          HASH=$(sha256sum "${{ matrix.model }}/seed.config" | cut -d ' ' -f1)
-          echo "SEED_HASH=$HASH" >> $GITHUB_ENV
-          echo "seed_hash=$HASH" >> $GITHUB_OUTPUT
 
       - name: "Restore repo cache from previous successful runs' artifacts"
         id: restore_repo_cache
@@ -216,7 +173,7 @@ jobs:
                     if [ -n "${ROOT_DIR_CAND}" ] && [ -d "${ROOT_DIR_CAND}/immortalwrt" ]; then
                       echo "Relocating restored cache directories from ${ROOT_DIR_CAND} into workspace..."
                       mkdir -p immortalwrt
-                      for p in .ccache dl build_dir/host staging_dir/host; do
+                      for p in .ccache dl feeds build_dir/host staging_dir/host build_dir/hostpkg staging_dir/hostpkg; do
                         if [ -d "${ROOT_DIR_CAND}/immortalwrt/${p}" ]; then
                           mkdir -p "immortalwrt/${p}"
                           rsync -a "${ROOT_DIR_CAND}/immortalwrt/${p}/" "immortalwrt/${p}/" || true
@@ -229,6 +186,18 @@ jobs:
                         rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
                       done
                       for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/toolchain-*; do
+                        [ -d "${m}" ] || continue
+                        base=$(basename "${m}")
+                        mkdir -p "immortalwrt/staging_dir/${base}"
+                        rsync -a "${m}/" "immortalwrt/staging_dir/${base}/" || true
+                      done
+                      for m in "${ROOT_DIR_CAND}"/immortalwrt/build_dir/target-*; do
+                        [ -d "${m}" ] || continue
+                        base=$(basename "${m}")
+                        mkdir -p "immortalwrt/build_dir/${base}"
+                        rsync -a "${m}/" "immortalwrt/build_dir/${base}/" || true
+                      done
+                      for m in "${ROOT_DIR_CAND}"/immortalwrt/staging_dir/target-*; do
                         [ -d "${m}" ] || continue
                         base=$(basename "${m}")
                         mkdir -p "immortalwrt/staging_dir/${base}"
@@ -251,6 +220,49 @@ jobs:
             echo "No cache found from previous successful runs. Proceeding with cold build."
           fi
           echo "hit=${HIT}" >> $GITHUB_OUTPUT
+
+      - name: Prepare ccache dir
+        run: mkdir -p immortalwrt/.ccache || true
+
+      - name: Restore ccache cache (per model/ref)
+        uses: actions/cache@v4
+        with:
+          path: immortalwrt/.ccache
+          key: ${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.model }}-
+            ${{ runner.os }}-ccache-
+
+      - name: Restore ImmortalWrt downloads cache (per model/ref)
+        uses: actions/cache@v4
+        with:
+          path: immortalwrt/dl
+          key: ${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}
+          restore-keys: |
+            ${{ runner.os }}-dl-${{ matrix.model }}-
+            ${{ runner.os }}-dl-
+
+      - name: Setup ccache
+        run: |
+          CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
+
+      - name: Restore feeds cache (per ref + feeds.conf)
+        uses: actions/cache@v4
+        with:
+          path: immortalwrt/feeds
+          key: ${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}
+          restore-keys: |
+            ${{ runner.os }}-feeds-
+
+      - name: Update feeds
+        run: |
+          cd immortalwrt
+          ./scripts/feeds update -a
+
+      - name: Install feeds
+        run: |
+          cd immortalwrt
+          ./scripts/feeds install -a
 
       - name: Generate config (enable ccache)
         run: |
@@ -284,7 +296,9 @@ jobs:
         if: ${{ steps.restore_repo_cache.outputs.hit != 'true' }}
         uses: actions/cache@v4
         with:
-          path: immortalwrt/build_dir/host
+          path: |
+            immortalwrt/build_dir/host
+            immortalwrt/staging_dir/host
           key: ${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}
           restore-keys: |
             ${{ runner.os }}-host-
@@ -357,7 +371,7 @@ jobs:
         with:
           name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
           path: ${{ steps.collect.outputs.files }}
-          retention-days: 90
+          retention-days: 7
           compression-level: 0 # No compression for binaries/pre-compressed firmware files
 
       - name: Upload repo cache artifact
@@ -368,10 +382,15 @@ jobs:
           path: |
             immortalwrt/.ccache
             immortalwrt/dl
+            immortalwrt/feeds
             immortalwrt/build_dir/host
             immortalwrt/staging_dir/host
+            immortalwrt/build_dir/target-*
+            immortalwrt/staging_dir/target-*
             immortalwrt/build_dir/toolchain-*
             immortalwrt/staging_dir/toolchain-*
+            immortalwrt/build_dir/hostpkg
+            immortalwrt/staging_dir/hostpkg
           if-no-files-found: ignore
           retention-days: 90
           compression-level: 0 # Mostly binaries/pre-compressed; faster uploads
