@@ -216,20 +216,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-hostpkg-
 
-      - name: Summarize cache hits
-        if: always()
-        run: |
-          {
-            echo "### Cache hits";
-            echo "- ccache: ${{ steps.cache-ccache.outputs.cache-hit || 'false' }} key=${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
-            echo "- dl: ${{ steps.cache-dl.outputs.cache-hit || 'false' }} key=${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
-            echo "- feeds: ${{ steps.cache-feeds.outputs.cache-hit || 'false' }} key=${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}";
-            echo "- toolchain: ${{ steps.cache-toolchain.outputs.cache-hit || 'false' }} key=${{ runner.os }}-toolchain-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
-            echo "- target-staging: ${{ steps.cache-target-staging.outputs.cache-hit || 'false' }} key=${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
-            echo "- target-build: ${{ steps.cache-target-build.outputs.cache-hit || 'false' }} key=${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
-            echo "- host: ${{ steps.cache-host.outputs.cache-hit || 'false' }} key=${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}";
-            echo "- hostpkg: ${{ steps.cache-hostpkg.outputs.cache-hit || 'false' }} key=${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}";
-          } >> $GITHUB_STEP_SUMMARY
+      
 
       - name: Compile the firmware
         id: compile
@@ -257,6 +244,8 @@ jobs:
         run: |
           set -e
           echo "Disk usage before cleanup:" && df -h
+          BEFORE_WS=$(du -sb immortalwrt | awk '{print $1}' || echo 0)
+          BEFORE_DF=$(df -B1 / | tail -1 | awk '{print $3}' || echo 0)
           echo "Cleaning up non-reused bulky artifacts..."
           # Drop large, low-reuse build outputs (keep caches we stream)
           rm -rf immortalwrt/tmp 2>/dev/null || true
@@ -264,10 +253,31 @@ jobs:
           # Trim huge logs
           find immortalwrt -name "*.log" -size +100M -delete 2>/dev/null || true
           echo "Disk usage after cleanup:" && df -h
+          AFTER_WS=$(du -sb immortalwrt | awk '{print $1}' || echo 0)
+          AFTER_DF=$(df -B1 / | tail -1 | awk '{print $3}' || echo 0)
+          FREED_WS=$((BEFORE_WS-AFTER_WS))
+          FREED_DF=$((BEFORE_DF-AFTER_DF))
+          echo "Workspace freed: $((FREED_WS/1024/1024)) MiB"
+          echo "Disk freed: $((FREED_DF/1024/1024)) MiB"
 
       - name: Check space usage
         if: ${{ !cancelled() }}
         run: df -hT
+
+      - name: Summarize cache hits
+        if: always()
+        run: |
+          {
+            echo "### Cache hits";
+            echo "- ccache: ${{ steps.cache-ccache.outputs.cache-hit || 'false' }} key=${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- dl: ${{ steps.cache-dl.outputs.cache-hit || 'false' }} key=${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- feeds: ${{ steps.cache-feeds.outputs.cache-hit || 'false' }} key=${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- toolchain: ${{ steps.cache-toolchain.outputs.cache-hit || 'false' }} key=${{ runner.os }}-toolchain-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- target-staging: ${{ steps.cache-target-staging.outputs.cache-hit || 'false' }} key=${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
+            echo "- target-build: ${{ steps.cache-target-build.outputs.cache-hit || 'false' }} key=${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
+            echo "- host: ${{ steps.cache-host.outputs.cache-hit || 'false' }} key=${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}";
+            echo "- hostpkg: ${{ steps.cache-hostpkg.outputs.cache-hit || 'false' }} key=${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}";
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Collect firmware files
         id: collect
