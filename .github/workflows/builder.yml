@@ -160,11 +160,6 @@ jobs:
           cd immortalwrt
           grep -q '^CONFIG_CCACHE=y' .config || echo 'CONFIG_CCACHE=y' >> .config
 
-      - name: Add TurboAcc
-        run: |
-          cd immortalwrt
-          curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
-
       - name: Generate build config
         run: |
           cd immortalwrt
