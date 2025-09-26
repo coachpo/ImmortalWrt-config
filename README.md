@@ -65,7 +65,6 @@ This table compares the features enabled by both seed configurations.
 | ✅ | ✅ | Network tools | socat with LuCI interface + Chinese UI | |
 | ✅ | ✅ | Advanced networking | Extensive networking tools (curl, wget, arping, etc.) | |
 | ✅ | ✅ | Editor (vim) | Full-featured CLI editor | |
-| ✅ | ❌ | TurboAcc | Hardware acceleration for NAT, flow offload, and SFE | TR3000 doesn't need |
 | ❌ | ✅ | File sharing | Samba4 server with Avahi, NetBIOS, VFS, and WSDD2 + Chinese UI | CR6606 lacks USB ports |
 | ❌ | ✅ | USB printing | Print server (p910nd JetDirect) with LuCI UI + Chinese UI | CR6606 lacks USB ports |
 | ❌ | ✅ | Disk management | LuCI disk manager with Btrfs, NTFS3 support + Chinese UI | CR6606 lacks USB ports |
