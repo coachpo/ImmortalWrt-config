@@ -65,7 +65,7 @@ make -j"$(nproc)" V=sc
 | ✅ | ✅ | 网络工具 | socat 及其 LuCI 界面（中文） | |
 | ✅ | ✅ | 高级网络工具 | 丰富的网络工具（curl、wget、arping 等） | |
 | ✅ | ✅ | 编辑器（vim） | 功能完善的命令行编辑器 | |
-| ✅ | ❌ | TurboAcc | NAT、流卸载和SFE的硬件加速 | TR3000无需此解决方案 |
+| ✅ | ❌ | TurboAcc | NAT、流卸载和SFE的硬件加速 | TR3000 无需此解决方案 |
 | ❌ | ✅ | 文件共享 | Samba4 服务器（含 Avahi、NetBIOS、VFS、WSDD2 + 中文界面） | CR6606 无 USB 接口 |
 | ❌ | ✅ | USB 打印 | 打印服务器（p910nd JetDirect）及 LuCI UI（中文） | CR6606 无 USB 接口 |
 | ❌ | ✅ | 磁盘管理 | LuCI 磁盘管理（Btrfs、NTFS3 支持 + 中文界面） | CR6606 无 USB 接口 |
