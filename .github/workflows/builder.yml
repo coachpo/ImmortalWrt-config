@@ -52,7 +52,7 @@ env:
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
-  CCACHE_MAX_SIZE: 4G
+  CCACHE_MAX_SIZE: 2G
   # Notification settings
   BARK_SUCCESS_SOUND: "birdsong"
   BARK_FAILURE_SOUND: "calypso"
@@ -276,24 +276,15 @@ jobs:
         if: always()
         run: |
           {
-            echo "## 📦 Cache Status Report";
-            echo "";
-            echo "### 🎯 Build Caches";
-            echo "| Cache Type | Status | Key |";
-            echo "|------------|--------|-----|";
-            echo "| **ccache** | ${{ steps.cache-ccache.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}\` |";
-            echo "| **dl** | ${{ steps.cache-dl.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}\` |";
-            echo "";
-            echo "### 🔧 Toolchain Caches";
-            echo "| Cache Type | Status | Key |";
-            echo "|------------|--------|-----|";
-            echo "| **toolchain** | ${{ steps.cache-toolchain.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-toolchain-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}\` |";
-            echo "";
-            echo "### 🎯 Target Caches";
-            echo "| Cache Type | Status | Key |";
-            echo "|------------|--------|-----|";
-            echo "| **target-staging** | ${{ steps.cache-target-staging.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}\` |";
-            echo "";
+            echo "### Cache hits";
+            echo "- ccache: ${{ steps.cache-ccache.outputs.cache-hit || 'false' }} key=${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- dl: ${{ steps.cache-dl.outputs.cache-hit || 'false' }} key=${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- feeds: ${{ steps.cache-feeds.outputs.cache-hit || 'false' }} key=${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- toolchain: ${{ steps.cache-toolchain.outputs.cache-hit || 'false' }} key=${{ runner.os }}-toolchain-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}";
+            echo "- target-staging: ${{ steps.cache-target-staging.outputs.cache-hit || 'false' }} key=${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
+            echo "- target-build: ${{ steps.cache-target-build.outputs.cache-hit || 'false' }} key=${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}";
+            echo "- host: ${{ steps.cache-host.outputs.cache-hit || 'false' }} key=${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}";
+            echo "- hostpkg: ${{ steps.cache-hostpkg.outputs.cache-hit || 'false' }} key=${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}";
           } >> $GITHUB_STEP_SUMMARY
 
       - name: Collect firmware files
