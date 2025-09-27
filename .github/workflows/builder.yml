@@ -52,7 +52,7 @@ env:
   UPLOAD_RELEASE: ${{ github.event.inputs.upload_release || 'true' }}
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
-  CCACHE_MAX_SIZE: 8G
+  CCACHE_MAX_SIZE: 4G
   # Notification settings
   BARK_SUCCESS_SOUND: "birdsong"
   BARK_FAILURE_SOUND: "calypso"
@@ -132,14 +132,7 @@ jobs:
             ${{ runner.os }}-dl-${{ matrix.model }}-
             ${{ runner.os }}-dl-
   
-      - name: Restore feeds cache (per ref + feeds.conf)
-        id: cache-feeds
-        uses: actions/cache@v4
-        with:
-          path: immortalwrt/feeds
-          key: ${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}
-          restore-keys: |
-            ${{ runner.os }}-feeds-
+      # Feeds cache removed - less important and can be rebuilt quickly
 
       - name: Update feeds
         run: |
@@ -187,38 +180,11 @@ jobs:
             ${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-
             ${{ runner.os }}-target-${{ matrix.model }}-
 
-      - name: Restore build target caches (per model/ref/seed)
-        id: cache-target-build
-        uses: actions/cache@v4
-        with:
-          path: |
-            immortalwrt/build_dir/target-*
-          key: ${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}
-          restore-keys: |
-            ${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-
-            ${{ runner.os }}-build-target-${{ matrix.model }}-
+      # Build target cache removed - less important than staging cache
 
-      - name: Restore host tools cache (per ref)
-        id: cache-host
-        uses: actions/cache@v4
-        with:
-          path: |
-            immortalwrt/build_dir/host
-            immortalwrt/staging_dir/host
-          key: ${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}
-          restore-keys: |
-            ${{ runner.os }}-host-
+      # Host tools cache removed - can be rebuilt quickly
 
-      - name: Restore hostpkg caches (per ref)
-        id: cache-hostpkg
-        uses: actions/cache@v4
-        with:
-          path: |
-            immortalwrt/build_dir/hostpkg
-            immortalwrt/staging_dir/hostpkg
-          key: ${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}
-          restore-keys: |
-            ${{ runner.os }}-hostpkg-
+      # Hostpkg cache removed - least important cache type
 
       - name: Compile the firmware
         id: compile
@@ -283,20 +249,16 @@ jobs:
             echo "|------------|--------|-----|";
             echo "| **ccache** | ${{ steps.cache-ccache.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-ccache-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}\` |";
             echo "| **dl** | ${{ steps.cache-dl.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-dl-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}\` |";
-            echo "| **feeds** | ${{ steps.cache-feeds.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-feeds-${{ hashFiles('immortalwrt/feeds.conf.default') }}-${{ env.IMMORTALWRT_REF }}\` |";
             echo "";
             echo "### 🔧 Toolchain Caches";
             echo "| Cache Type | Status | Key |";
             echo "|------------|--------|-----|";
             echo "| **toolchain** | ${{ steps.cache-toolchain.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-toolchain-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}\` |";
-            echo "| **host** | ${{ steps.cache-host.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-host-${{ env.IMMORTALWRT_REF }}\` |";
-            echo "| **hostpkg** | ${{ steps.cache-hostpkg.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-hostpkg-${{ env.IMMORTALWRT_REF }}\` |";
             echo "";
             echo "### 🎯 Target Caches";
             echo "| Cache Type | Status | Key |";
             echo "|------------|--------|-----|";
             echo "| **target-staging** | ${{ steps.cache-target-staging.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}\` |";
-            echo "| **target-build** | ${{ steps.cache-target-build.outputs.cache-hit == 'true' && '✅ HIT' || '❌ MISS' }} | \`${{ runner.os }}-build-target-${{ matrix.model }}-${{ env.IMMORTALWRT_REF }}-${{ steps.seed.outputs.seed_hash }}\` |";
             echo "";
           } >> $GITHUB_STEP_SUMMARY
 
