@@ -47,6 +47,8 @@ env:
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
   CCACHE_MAX_SIZE: 4G
+  CCACHE_DIR: ${{ github.workspace }}/immortalwrt/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}/immortalwrt
   # Notification settings
   BARK_SUCCESS_SOUND: "birdsong"
   BARK_FAILURE_SOUND: "calypso"
@@ -144,6 +146,15 @@ jobs:
       - name: Setup ccache
         run: |
           CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
+
+      - name: Verify ccache setup (pre-build)
+        run: |
+          which ccache || true
+          ccache --version || true
+          echo "CCACHE_DIR (intended): $GITHUB_WORKSPACE/immortalwrt/.ccache"
+          cd immortalwrt
+          echo "Check .config for CONFIG_CCACHE:" && grep -n '^CONFIG_CCACHE' .config || true
+          CCACHE_DIR="$GITHUB_WORKSPACE/immortalwrt/.ccache" ccache -z || true
 
       - name: Restore ImmortalWrt downloads cache (per model/ref)
         id: cache-dl
@@ -247,6 +258,7 @@ jobs:
         id: compile
         run: |
           cd immortalwrt
+          export CCACHE_DIR="$(pwd)/.ccache"
           if [ "${DEBUG_BUILD}" = "true" ]; then
             JOBS=1
           else
