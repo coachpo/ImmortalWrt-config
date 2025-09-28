@@ -1,0 +1,135 @@
+name: 01_build-immortalwrt-firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug_build:
+        description: 'Debug build: single-thread + verbose logs'
+        type: boolean
+        required: false
+        default: false
+      jobs:
+        description: 'Parallel jobs: auto=nproc, or fixed number'
+        type: choice
+        required: false
+        default: auto
+        options:
+          - auto
+          - "1"
+          - "2"
+          - "4"
+          - "8"
+          - "16"
+      model:
+        description: 'Select model to build'
+        type: choice
+        required: false
+        default: all
+        options:
+          - all
+          - cr6606
+          - tr3000
+      immortalwrt_ref:
+        description: 'ImmortalWrt git ref (branch, tag, or commit SHA)'
+        type: string
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.model || 'all' }}-${{ (github.event.inputs.immortalwrt_ref && github.event.inputs.immortalwrt_ref) || (vars.IMMORTALWRT_REF && vars.IMMORTALWRT_REF) || 'default' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMMORTALWRT_REF: ${{ github.event.inputs.immortalwrt_ref || vars.IMMORTALWRT_REF }}
+  DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
+  JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
+  CCACHE_MAX_SIZE: 2G
+  # Notification settings
+  BARK_SUCCESS_SOUND: "birdsong"
+  BARK_FAILURE_SOUND: "calypso"
+  BARK_ICON: "https://firmware-selector.immortalwrt.org/favicon.ico"
+  BARK_GROUP: "ImmortalWrt"
+
+jobs:
+  notify-completion-success:
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Notify via Bark
+        if: always()
+        uses: harryzcy/action-bark@v2.3.0
+        with:
+          status: success
+          on_status: success, failure, cancelled, skipped
+          title: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('⏹️ImmortalWrt⏹️: Cancelled (Run #{0})', github.run_number) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('⏭️ImmortalWrt⏭️: Skipped (Run #{0})', github.run_number) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && format('🚀ImmortalWrt🚀: Success (Run #{0})', github.run_number) || format('💥ImmortalWrt💥: Failed (Run #{0})', github.run_number) }}"
+          body: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('Run #{0}: ⏹️ Workflow cancelled - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('Run #{0}: ⏭️ Workflow skipped - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && ( needs.release.result == 'success' && format('Run #{0}: ✅ release published (tag: {1}).', github.run_number, needs.release.outputs.release_tag) || ( github.event_name == 'workflow_dispatch' && github.event.inputs.model != '' && github.event.inputs.model != 'all' && format('Run #{0}: ✅ firmware for {1} built successfully.', github.run_number, github.event.inputs.model) || format('Run #{0}: ✅ firmware built successfully.', github.run_number) ) ) || format('Run #{0}: 💥 Build failed: build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) }}"
+          bark_server_url: ${{ secrets.BARK_SERVER_URL }}
+          device_key: ${{ secrets.BARK_DEVICE_KEY }}
+          level: active
+          sound: ${{ ((needs.release.result == 'success') || (needs.build.result == 'success')) && env.BARK_SUCCESS_SOUND || env.BARK_FAILURE_SOUND }}
+          icon: ${{ env.BARK_ICON }}
+          group: ${{ env.BARK_GROUP }}
+
+  notify-completion-failed:
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Notify via Bark
+        if: always()
+        uses: harryzcy/action-bark@v2.3.0
+        with:
+          status: failure
+          on_status: success, failure, cancelled, skipped
+          title: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('⏹️ImmortalWrt⏹️: Cancelled (Run #{0})', github.run_number) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('⏭️ImmortalWrt⏭️: Skipped (Run #{0})', github.run_number) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && format('🚀ImmortalWrt🚀: Success (Run #{0})', github.run_number) || format('💥ImmortalWrt💥: Failed (Run #{0})', github.run_number) }}"
+          body: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('Run #{0}: ⏹️ Workflow cancelled - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('Run #{0}: ⏭️ Workflow skipped - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && ( needs.release.result == 'success' && format('Run #{0}: ✅ release published (tag: {1}).', github.run_number, needs.release.outputs.release_tag) || ( github.event_name == 'workflow_dispatch' && github.event.inputs.model != '' && github.event.inputs.model != 'all' && format('Run #{0}: ✅ firmware for {1} built successfully.', github.run_number, github.event.inputs.model) || format('Run #{0}: ✅ firmware built successfully.', github.run_number) ) ) || format('Run #{0}: 💥 Build failed: build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) }}"
+          bark_server_url: ${{ secrets.BARK_SERVER_URL }}
+          device_key: ${{ secrets.BARK_DEVICE_KEY }}
+          level: active
+          sound: ${{ ((needs.release.result == 'success') || (needs.build.result == 'success')) && env.BARK_SUCCESS_SOUND || env.BARK_FAILURE_SOUND }}
+          icon: ${{ env.BARK_ICON }}
+          group: ${{ env.BARK_GROUP }}
+
+  notify-completion-cancelled:
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Notify via Bark
+        if: always()
+        uses: harryzcy/action-bark@v2.3.0
+        with:
+          status: cancelled
+          on_status: success, failure, cancelled, skipped
+          title: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('⏹️ImmortalWrt⏹️: Cancelled (Run #{0})', github.run_number) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('⏭️ImmortalWrt⏭️: Skipped (Run #{0})', github.run_number) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && format('🚀ImmortalWrt🚀: Success (Run #{0})', github.run_number) || format('💥ImmortalWrt💥: Failed (Run #{0})', github.run_number) }}"
+          body: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('Run #{0}: ⏹️ Workflow cancelled - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('Run #{0}: ⏭️ Workflow skipped - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && ( needs.release.result == 'success' && format('Run #{0}: ✅ release published (tag: {1}).', github.run_number, needs.release.outputs.release_tag) || ( github.event_name == 'workflow_dispatch' && github.event.inputs.model != '' && github.event.inputs.model != 'all' && format('Run #{0}: ✅ firmware for {1} built successfully.', github.run_number, github.event.inputs.model) || format('Run #{0}: ✅ firmware built successfully.', github.run_number) ) ) || format('Run #{0}: 💥 Build failed: build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) }}"
+          bark_server_url: ${{ secrets.BARK_SERVER_URL }}
+          device_key: ${{ secrets.BARK_DEVICE_KEY }}
+          level: active
+          sound: ${{ ((needs.release.result == 'success') || (needs.build.result == 'success')) && env.BARK_SUCCESS_SOUND || env.BARK_FAILURE_SOUND }}
+          icon: ${{ env.BARK_ICON }}
+          group: ${{ env.BARK_GROUP }}
+
+  notify-completion-skipped:
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Notify via Bark
+        if: always()
+        uses: harryzcy/action-bark@v2.3.0
+        with:
+          status: skipped
+          on_status: success, failure, cancelled, skipped
+          title: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('⏹️ImmortalWrt⏹️: Cancelled (Run #{0})', github.run_number) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('⏭️ImmortalWrt⏭️: Skipped (Run #{0})', github.run_number) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && format('🚀ImmortalWrt🚀: Success (Run #{0})', github.run_number) || format('💥ImmortalWrt💥: Failed (Run #{0})', github.run_number) }}"
+          body: "${{ (needs.build.result == 'cancelled' || needs.release.result == 'cancelled') && format('Run #{0}: ⏹️ Workflow cancelled - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || (needs.build.result == 'skipped' || needs.release.result == 'skipped') && format('Run #{0}: ⏭️ Workflow skipped - build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) || ((needs.release.result == 'success') || (needs.build.result == 'success')) && ( needs.release.result == 'success' && format('Run #{0}: ✅ release published (tag: {1}).', github.run_number, needs.release.outputs.release_tag) || ( github.event_name == 'workflow_dispatch' && github.event.inputs.model != '' && github.event.inputs.model != 'all' && format('Run #{0}: ✅ firmware for {1} built successfully.', github.run_number, github.event.inputs.model) || format('Run #{0}: ✅ firmware built successfully.', github.run_number) ) ) || format('Run #{0}: 💥 Build failed: build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) }}"
+          bark_server_url: ${{ secrets.BARK_SERVER_URL }}
+          device_key: ${{ secrets.BARK_DEVICE_KEY }}
+          level: active
+          sound: ${{ ((needs.release.result == 'success') || (needs.build.result == 'success')) && env.BARK_SUCCESS_SOUND || env.BARK_FAILURE_SOUND }}
+          icon: ${{ env.BARK_ICON }}
+          group: ${{ env.BARK_GROUP }}
