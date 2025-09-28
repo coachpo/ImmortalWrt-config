@@ -3,11 +3,6 @@ name: 01_build-immortalwrt-firmware
 on:
   workflow_dispatch:
     inputs:
-      upload_release:
-        description: 'Upload firmware artifacts and publish GitHub Release'
-        type: boolean
-        required: false
-        default: true
       debug_build:
         description: 'Debug build: single-thread + verbose logs'
         type: boolean
@@ -348,7 +343,7 @@ jobs:
 
       - name: Upload firmware files
         uses: actions/upload-artifact@v4
-        if: ${{ github.event.inputs.upload_release == 'true' && !cancelled() }}
+        if: ${{ !cancelled() }}
         with:
           name: immortalwrt_firmware_${{ matrix.model }}${{ steps.compile.outputs.file_date }}
           path: ${{ steps.collect.outputs.files }}
@@ -356,7 +351,7 @@ jobs:
           compression-level: 0 # No compression for binaries/pre-compressed firmware files
 
   release:
-    if: ${{ always() && needs.build.result == 'success' && github.event.inputs.upload_release == 'true' }}
+    if: ${{ always() && needs.build.result == 'success' }}
     needs: build
     runs-on: ubuntu-latest
     outputs:
@@ -425,11 +420,11 @@ jobs:
         with:
           status: ${{ job.status }}
           on_status: success, failure, cancelled, skipped
-          title: "${{ ((github.event.inputs.upload_release == 'true' && needs.release.result == 'success') || (github.event.inputs.upload_release != 'true' && needs.build.result == 'success')) && format('🚀ImmortalWrt🚀: Success (Run #{0})', github.run_number) || format('💥ImmortalWrt💥: Failed (Run #{0})', github.run_number) }}"
-          body: "${{ ((github.event.inputs.upload_release == 'true' && needs.release.result == 'success') || (github.event.inputs.upload_release != 'true' && needs.build.result == 'success')) && ( github.event.inputs.upload_release == 'true' && format('Run #{0}: ✅ release published (tag: {1}).', github.run_number, needs.release.outputs.release_tag) || ( github.event_name == 'workflow_dispatch' && github.event.inputs.model != '' && github.event.inputs.model != 'all' && format('Run #{0}: ✅ firmware for {1} built successfully.', github.run_number, github.event.inputs.model) || format('Run #{0}: ✅ firmware built successfully.', github.run_number) ) ) || format('Run #{0}: 💥 Build failed: build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) }}"
+          title: "${{ ((needs.release.result == 'success') || (needs.build.result == 'success')) && format('🚀ImmortalWrt🚀: Success (Run #{0})', github.run_number) || format('💥ImmortalWrt💥: Failed (Run #{0})', github.run_number) }}"
+          body: "${{ ((needs.release.result == 'success') || (needs.build.result == 'success')) && ( needs.release.result == 'success' && format('Run #{0}: ✅ release published (tag: {1}).', github.run_number, needs.release.outputs.release_tag) || ( github.event_name == 'workflow_dispatch' && github.event.inputs.model != '' && github.event.inputs.model != 'all' && format('Run #{0}: ✅ firmware for {1} built successfully.', github.run_number, github.event.inputs.model) || format('Run #{0}: ✅ firmware built successfully.', github.run_number) ) ) || format('Run #{0}: 💥 Build failed: build={1}, release={2}', github.run_number, needs.build.result, needs.release.result) }}"
           bark_server_url: ${{ secrets.BARK_SERVER_URL }}
           device_key: ${{ secrets.BARK_DEVICE_KEY }}
           level: active
-          sound: ${{ ((github.event.inputs.upload_release == 'true' && needs.release.result == 'success') || (github.event.inputs.upload_release != 'true' && needs.build.result == 'success')) && env.BARK_SUCCESS_SOUND || env.BARK_FAILURE_SOUND }}
+          sound: ${{ ((needs.release.result == 'success') || (needs.build.result == 'success')) && env.BARK_SUCCESS_SOUND || env.BARK_FAILURE_SOUND }}
           icon: ${{ env.BARK_ICON }}
           group: ${{ env.BARK_GROUP }}
