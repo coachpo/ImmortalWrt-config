@@ -147,15 +147,6 @@ jobs:
         run: |
           CCACHE_DIR=immortalwrt/.ccache ccache -M ${CCACHE_MAX_SIZE}
 
-      - name: Verify ccache setup (pre-build)
-        run: |
-          which ccache || true
-          ccache --version || true
-          echo "CCACHE_DIR (intended): $GITHUB_WORKSPACE/immortalwrt/.ccache"
-          cd immortalwrt
-          echo "Check .config for CONFIG_CCACHE:" && grep -n '^CONFIG_CCACHE' .config || true
-          CCACHE_DIR="$GITHUB_WORKSPACE/immortalwrt/.ccache" ccache -z || true
-
       - name: Restore ImmortalWrt downloads cache (per model/ref)
         id: cache-dl
         uses: actions/cache@v4
@@ -198,6 +189,18 @@ jobs:
         run: |
           cd immortalwrt
           make defconfig
+
+      - name: Verify ccache setup (pre-build)
+        run: |
+          which ccache || true
+          ccache --version || true
+          echo "CCACHE_DIR (env): ${CCACHE_DIR}"
+          echo "CCACHE_BASEDIR (env): ${CCACHE_BASEDIR}"
+          cd immortalwrt
+          echo "Check .config for CONFIG_CCACHE:" && grep -n '^CONFIG_CCACHE' .config || true
+          echo "Check .config for CONFIG_CCACHE_DIR:" && grep -n '^CONFIG_CCACHE_DIR' .config || true
+          ccache -p | sed -n 's/^cache_dir = /cache_dir = /p' || true
+          ccache -z || true
 
       - name: Restore toolchain caches (per model/ref)
         id: cache-toolchain
