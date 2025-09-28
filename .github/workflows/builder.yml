@@ -46,7 +46,7 @@ env:
   IMMORTALWRT_REF: ${{ github.event.inputs.immortalwrt_ref || vars.IMMORTALWRT_REF }}
   DEBUG_BUILD: ${{ github.event.inputs.debug_build || 'false' }}
   JOBS_INPUT: ${{ github.event.inputs.jobs || 'auto' }}
-  CCACHE_MAX_SIZE: 2G
+  CCACHE_MAX_SIZE: 4G
   # Notification settings
   BARK_SUCCESS_SOUND: "birdsong"
   BARK_FAILURE_SOUND: "calypso"
