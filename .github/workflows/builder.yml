@@ -72,16 +72,18 @@ jobs:
         model: ${{ fromJSON((github.event.inputs.model == '' || github.event.inputs.model == 'all') && '["cr6606","tr3000"]' || format('["{0}"]', github.event.inputs.model)) }}
 
     steps:
-      - name: Maximize build disk space
-        uses: easimon/maximize-build-space@v10
+      - name: Remove unwanted software to free disk
+        uses: AdityaGarg8/remove-unwanted-software@v5
         with:
-          root-reserve-mb: 2048
-          temp-reserve-mb: 200
-          swap-size-mb: 2048
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
+          remove-docker-images: 'true'
+          remove-large-packages: 'false'
+          remove-cached-tools: 'false'
+          remove-swapfile: 'false'
+          verbose: 'true'
 
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
