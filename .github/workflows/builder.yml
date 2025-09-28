@@ -83,7 +83,7 @@ jobs:
           remove-large-packages: 'false'
           remove-cached-tools: 'false'
           remove-swapfile: 'false'
-          verbose: 'true'
+          verbose: 'false'
 
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
