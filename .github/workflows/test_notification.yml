@@ -51,7 +51,7 @@ env:
   BARK_SUCCESS_SOUND: "birdsong"
   BARK_FAILURE_SOUND: "calypso"
   BARK_ICON: "https://firmware-selector.immortalwrt.org/favicon.ico"
-  BARK_GROUP: "ImmortalWrt"
+  BARK_GROUP: "TEST"
 
 jobs:
   notify-completion-success:
