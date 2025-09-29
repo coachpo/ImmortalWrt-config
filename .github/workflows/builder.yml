@@ -1,4 +1,4 @@
-name: 01_build-immortalwrt-firmware
+name: 01-build-immortalwrt-firmware
 
 on:
   workflow_dispatch:

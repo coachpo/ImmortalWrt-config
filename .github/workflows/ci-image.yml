@@ -1,4 +1,4 @@
-name: 99_build-ci-image
+name: 99-build-ci-image
 
 on:
   workflow_dispatch:
