@@ -289,12 +289,12 @@ jobs:
           echo "Cleaning up non-reused bulky artifacts..."
           # Drop large, low-reuse build outputs (keep caches we stream)
           rm -rf immortalwrt/tmp 2>/dev/null || true
-          rm -rf immortalwrt/bin/packages 2>/dev/null || true
+          # rm -rf immortalwrt/bin/packages 2>/dev/null || true
           # Prune heavy low-reuse targets content to keep cache lean
-          find immortalwrt/build_dir -maxdepth 1 -type d -name 'target-*' -print0 | while IFS= read -r -d '' tgt; do
-            rm -rf "$tgt"/linux-* 2>/dev/null || true
-            rm -rf "$tgt"/samba-* 2>/dev/null || true
-          done
+          # find immortalwrt/build_dir -maxdepth 1 -type d -name 'target-*' -print0 | while IFS= read -r -d '' tgt; do
+          #   rm -rf "$tgt"/linux-* 2>/dev/null || true
+          #   rm -rf "$tgt"/samba-* 2>/dev/null || true
+          # done
           # Trim huge logs
           find immortalwrt -name "*.log" -size +100M -delete 2>/dev/null || true
           echo "Disk usage after cleanup:" && df -h
