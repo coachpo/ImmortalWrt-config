@@ -305,7 +305,9 @@ jobs:
           echo "Workspace freed: $((FREED_WS/1024/1024)) MiB"
           echo "Disk freed: $((FREED_DF/1024/1024)) MiB"
       
-      - name: ccache stats
+      # Note: Restored target caches (build_dir/target-* and staging_dir/target-*) can short-circuit compilation,
+      # so ccache may show zero stats even when configured correctly.
+      - name: Ccache stats
         if: ${{ !cancelled() }}
         run: |
           CCACHE_DIR=immortalwrt/.ccache ccache -s || true
