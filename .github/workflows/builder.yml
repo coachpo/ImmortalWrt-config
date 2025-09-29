@@ -90,7 +90,6 @@ jobs:
       - name: Install build dependencies (host)
         run: |
           sudo apt-get update -y
-          sudo apt-get full-upgrade -y
           sudo apt-get install -y --no-install-recommends \
             ack antlr3 asciidoc autoconf automake autopoint binutils gcc-multilib gettext flex gawk \
             bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar \
